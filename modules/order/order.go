@@ -2,7 +2,7 @@ package order
 
 import (
 	"fmt"
-	"AgriTrace/broker"
+	"AgriTrace/Internal/EventBus"
 )
 
 func CreateOrder(b *event_bus.EventBus, orderID int) {

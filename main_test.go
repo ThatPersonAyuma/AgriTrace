@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"AgriTrace/broker"
+	"AgriTrace/Internal/EventBus"
 	"AgriTrace/modules/order"
 )
 

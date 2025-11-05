@@ -1,7 +1,8 @@
 package event_bus
 
-import "sync"
-
+import (
+	"sync"
+)
 // Define a payload to store any value
 type Event struct {
 	Payload any

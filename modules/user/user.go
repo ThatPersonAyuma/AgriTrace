@@ -1,6 +1,6 @@
 package user
 import (
 	"fmt"
-	"AgriTrace/broker"
+	"AgriTrace/Internal/EventBus"
 )
 
