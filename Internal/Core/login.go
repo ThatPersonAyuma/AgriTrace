@@ -1,7 +1,7 @@
 package core
 
 import (
-	"AgriTrace/Internal/Adapters"
+	"AgriTrace/Internal/Adapters/Log"
 	"AgriTrace/Internal/EventBus"
 	"AgriTrace/Internal/Generic"
 )
@@ -10,12 +10,12 @@ func LoginCheck(usrname string, pw string, users map[string]string) generic.Resu
 	value, ok := users[usrname]
 	if ok{
 		if pw == value {
-			return generic.Result[bool, error]{Value: true, Effect: adapters.CreateLog("login berhasil atas username: " + usrname, "Success")}
+			return generic.Result[bool, error]{Value: true, Effect: log.CreateLog("login berhasil atas username: " + usrname, "Success")}
 		}else{
-			return generic.Result[bool, error]{Value: false, Effect: adapters.CreateLog("login gagal atas username: " + usrname + " password salah", "Wrong Password")}
+			return generic.Result[bool, error]{Value: false, Effect: log.CreateLog("login gagal atas username: " + usrname + " password salah", "Wrong Password")}
 		}
 	}else{
-		return generic.Result[bool, error]{Value: false, Effect: adapters.CreateLog("username tidak ada", "Not Found")}
+		return generic.Result[bool, error]{Value: false, Effect: log.CreateLog("username tidak ada", "Not Found")}
 	}
 }
 
