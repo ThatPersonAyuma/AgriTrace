@@ -14,6 +14,17 @@ type Result[T any, return_effect any] struct{
 	Effect func() return_effect
 }
 
+type JobResult struct {
+    Status string      `json:"status"` // "pending", "done", "error"
+    Result map[string]any `json:"result,omitempty"` // optional, usually JSON-able
+    Error  string      `json:"error,omitempty"`
+}
+
+type JobStore struct {
+	sync.RWMutex
+	Data map[string]JobResult
+}
+
 // Lazy memoizes result of f() and is safe for concurrent use.
 type Lazy[T any] struct {
 	once sync.Once
@@ -42,3 +53,4 @@ func (l *Lazy[T]) Get() (T, error) { // Impure
 	defer l.mu.Unlock()
 	return l.v, l.err
 }
+

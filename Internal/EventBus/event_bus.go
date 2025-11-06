@@ -5,6 +5,7 @@ import (
 )
 // Define a payload to store any value
 type Event struct {
+	WorkId string
 	Payload any
 }
 
