@@ -21,8 +21,10 @@ func ListenDynWork(b *event_bus.EventBus, topic string, min_workers, max_workers
 			default:
 				if count < max_count{
 					go worker(jobs)
+					go func() { jobs <- job }()
+				}else{
+					fmt.Printf("Fatal Too Much Request")
 				}
-				go func() { jobs <- job }()
 			}
 		}
 	}(i, max_workers)
