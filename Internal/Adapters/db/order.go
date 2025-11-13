@@ -1,4 +1,4 @@
-package db 
+package main
 
 import (
     "database/sql"
@@ -7,7 +7,7 @@ import (
 )
 
 func ConnectDB() (*sql.DB, error) {
-    connStr := "postgres://postgres;Password=admin123@localhost:5432/AGRITRACEsslmode=disable"
+    connStr := "postgres://postgres:admin123@localhost:5432/AGRITRACE?sslmode=disable"
     db, err := sql.Open("postgres", connStr)
     if err != nil {
         return nil, fmt.Errorf("gagal membuka koneksi: %v", err)
@@ -19,4 +19,11 @@ func ConnectDB() (*sql.DB, error) {
 
     fmt.Println("Berhasil terhubung ke PostgreSQL!")
     return db, nil
+}
+
+func main() {
+    _, err := ConnectDB()
+    if err != nil {
+        fmt.Println(err)
+    }
 }
