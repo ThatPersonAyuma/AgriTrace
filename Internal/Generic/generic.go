@@ -9,9 +9,9 @@ type UserLogin struct{
 	Password string `json:"password"`
 }
 
-type Result[T any, return_effect any] struct{
+type Result[T any] struct{
 	Value T
-	Effect func() return_effect
+	Effect func() error
 }
 
 type JobResult struct {

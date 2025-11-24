@@ -43,13 +43,13 @@ func CreateGetStatusHandler(job_store *generic.JobStore) http.HandlerFunc{
 
 func CreateFuncHandler[T any](b *event_bus.EventBus, job_store *generic.JobStore, method string, topic string)func(http.ResponseWriter, *http.Request){
 	return func (w http.ResponseWriter, r *http.Request){
-		// Pastikan method POST
+
 		if r.Method != method {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		var payload T
-		// Decode JSON body
+
 		err := json.NewDecoder(r.Body).Decode(&payload)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
@@ -60,7 +60,7 @@ func CreateFuncHandler[T any](b *event_bus.EventBus, job_store *generic.JobStore
 									Status: "Processing",
 								}
 		b.Publish(topic, event_bus.Event{WorkId: id, Payload: payload})
-		// Create Return Job ID
+
 		w.Header().Set("Content-Type", "application/json")
         json.NewEncoder(w).Encode(map[string]string{
             "job_id": id,
