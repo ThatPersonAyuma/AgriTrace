@@ -1,21 +1,38 @@
 package main
 
 import (
+	"AgriTrace/Internal"
+	"AgriTrace/Internal/EventBus"
 	"context"
+	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
-	"AgriTrace/Internal/EventBus"
-	"AgriTrace/Internal"
 )
 
 func main() {
 	eventBus := event_bus.NewEventBus()
 	mux := http.NewServeMux()
+	connStr := "user=postgres password=tIdakIngat dbname=AgriTrace sslmode=disable"
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer db.Close()
 
-	internal.Setup()(mux, eventBus)
+	db.SetMaxOpenConns(20)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(time.Hour)
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Error connecting to database: %v", err)
+	}
+	fmt.Println("Successfully connected to PostgreSQL!")
+	internal.Setup()(mux, eventBus, db)
 
 	server := &http.Server{
 		Addr:    ":8080",

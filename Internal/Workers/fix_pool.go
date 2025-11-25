@@ -2,7 +2,8 @@ package workers
 
 import (
 	"AgriTrace/Internal/EventBus"
-	logistic "AgriTrace/Internal/Core/Logistic"
+	generic "AgriTrace/Internal/Generic"
+	"database/sql"
 	"fmt"
 )
 type Job = func() error
@@ -11,49 +12,57 @@ type Job = func() error
 // 	"fmt"
 // )
 
-func handleEffect(e logistic.Effect) error {
+func handleEffect(e generic.Effect, db *sql.DB) func() error {
     switch e.Type {
-    case logistic.EffectDB:
+    case generic.EffectDB:
         // contoh DB handler (sesuaikan dengan DB Anda)
-        _, err := db.Exec(e.Query, e.Args...)
-        return err
+        return func() error {_, err := db.Exec(e.EcexCommand, e.Args...)
+        return err}
 
-    case logistic.EffectLog:
-        fmt.Println("[LOG]", e.Msg)
-        return nil
+	// case generic.EffectDBQuerry:
+    //     // contoh DB handler (sesuaikan dengan DB Anda)
+    //     return func() error {_, err := db.Query(e.EcexCommand, e.Args...)
+    //     return err}
 
-    case logistic.EffectNotify:
-        fmt.Println("[NOTIFY]", e.Msg)
-        return nil
+    case generic.EffectLog:
+        return func() error {fmt.Println("[LOG]", e.Msg)
+        return nil}
 
-    case logistic.EffectEmail:
-        fmt.Println("[EMAIL]", e.Msg)
-        return nil
+    case generic.EffectNotify:
+        return func() error{fmt.Println("[NOTIFY]", e.Msg)
+        return nil}
+
+    case generic.EffectEmail:
+        return func() error {fmt.Println("[EMAIL]", e.Msg)
+        return nil}
+
+	case generic.EffectComplex:
+		return e.Fn
 
     default:
-        return fmt.Errorf("unknown effect type: %v", e.Type)
+        return func() error {return fmt.Errorf("unknown effect type: %v", e.Type)}
     }
 }
 
-func ListenFixWorks(b *event_bus.EventBus, topic string, workers int) chan []logistic.Effect {
+func ListenFixWorks(b *event_bus.EventBus, topic string, workers int, db *sql.DB) chan []generic.Effect {
 	sub := b.Subscribe(topic)
-	jobs := make(chan []logistic.Effect, 50)
+	jobs := make(chan []generic.Effect, 50)
 
 	for i := 0; i < workers; i++ {
-		go func(id int) {
+		go func(id int, db *sql.DB) {
 			for effects := range jobs {
 				for _, ef := range effects {
-					if err := handleEffect(ef); err != nil {
+					if err := handleEffect(ef, db)(); err != nil {
 						fmt.Printf("[FIXED WORKER %d] error: %v\n", id, err)
 					}
 				}
 			}
-		}(i)
+		}(i, db)
 	}
 
 	go func() {
 		for event := range sub {
-			jobs <- event.Payload.([]logistic.Effect)
+			jobs <- event.Payload.([]generic.Effect)
 		}
 		close(jobs)
 	}()

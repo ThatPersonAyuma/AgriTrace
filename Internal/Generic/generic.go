@@ -54,3 +54,20 @@ func (l *Lazy[T]) Get() (T, error) { // Impure
 	return l.v, l.err
 }
 
+type Effect struct {
+    Type  EffectType
+    EcexCommand string
+    Args  []any
+    Msg   string
+	Fn	  func() error
+}
+
+type EffectType int
+
+const (
+    EffectDB EffectType = iota
+    EffectLog
+    EffectNotify
+    EffectEmail
+	EffectComplex
+)

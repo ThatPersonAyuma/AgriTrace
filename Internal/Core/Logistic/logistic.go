@@ -1,7 +1,7 @@
 package logistic
 
 import (
-	// generic "AgriTrace/Internal/Generic"
+	generic "AgriTrace/Internal/Generic"
 	// "database/sql"
 	"fmt"
 	"time"
@@ -37,21 +37,6 @@ import (
 
 // }
 
-type Effect struct {
-    Type  EffectType
-    Query string
-    Args  []any
-    Msg   string
-}
-
-type EffectType int
-
-const (
-    EffectDB EffectType = iota
-    EffectLog
-    EffectNotify
-    EffectEmail
-)
 
 
 func GetShipmentCreatedEffect( // Fungsi untuk membuat data yang dibutuhkan effect atau work
@@ -61,27 +46,27 @@ func GetShipmentCreatedEffect( // Fungsi untuk membuat data yang dibutuhkan effe
     endLat float64,
     endLong float64,
     now time.Time,
-) []Effect {
-    return []Effect{
+) []generic.Effect {
+    return []generic.Effect{
         {
-            Type: EffectDB,
-            Query: `
+            Type: generic.EffectDBExec,
+            EcexCommand: `
                 INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, notes)
                 VALUES ($1, $2, $3, $4, $5, $6)
             `,
             Args: []any{orderID, "START_CREATED", now, startLat, startLong, "Initial start checkpoint"},
         },
         {
-            Type: EffectDB,
-            Query: `
+            Type: generic.EffectDBExec,
+            EcexCommand: `
                 INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, notes)
                 VALUES ($1, $2, $3, $4, $5, $6)
             `,
             Args: []any{orderID, "END_CREATED", now, endLat, endLong, "Initial end checkpoint"},
         },
         {
-            Type: EffectDB,
-            Query: `
+            Type: generic.EffectDBExec,
+            EcexCommand: `
                 UPDATE "order"
                 SET status=$1, start_delivery=$2, updated_at=$3
                 WHERE id=$4
@@ -89,7 +74,7 @@ func GetShipmentCreatedEffect( // Fungsi untuk membuat data yang dibutuhkan effe
             Args: []any{"CREATED", now, now, orderID},
         },
         {
-            Type: EffectLog,
+            Type: generic.EffectLog,
             Msg:  fmt.Sprintf("Shipment %d created at %v", orderID, now),
         },
     }

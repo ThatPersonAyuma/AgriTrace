@@ -1,35 +1,91 @@
+// package workers
+
+// import (
+// 	"AgriTrace/Internal/EventBus"
+// 	generic "AgriTrace/Internal/Generic"
+// 	"database/sql"
+// 	"fmt"
+// )
+
+// func ListenDynWork(b *event_bus.EventBus, topic string, minWorkers, maxWorkers int, db *sql.DB) chan []generic.Effect {
+// 	sub := b.Subscribe(topic)
+// 	jobs := make(chan []generic.Effect, 50)
+
+// 	// Initial workers
+// 	active := 0
+// 	for active < minWorkers {
+// 		go dynWorker(jobs, db)
+// 		active++
+// 	}
+
+// 	// dispatcher
+// 	go func(active, max int) {
+// 		for event := range sub {
+// 			effects := event.Payload.([]generic.Effect)
+
+// 			select {
+// 			case jobs <- effects:
+// 				// OK
+// 			default:
+// 				if active < max {
+// 					go dynWorker(jobs, db)
+// 					active++
+// 					jobs <- effects
+// 				} else {
+// 					fmt.Println("[DYN] OVERLOAD: MAX WORKER REACHED")
+// 				}
+// 			}
+// 		}
+// 	}(active, maxWorkers)
+
+// 	return jobs
+// }
+
+// func dynWorker(jobs <-chan []generic.Effect, db *sql.DB) {
+// 	for effects := range jobs {
+// 		for _, e := range effects {
+// 			if err := handleEffect(e, db); err != nil {
+// 				fmt.Println("[DYNAMIC WORKER] error:", err)
+// 			}
+// 			fmt.Println("Running work, work id:")
+// 		}
+// 	}
+// }
+
+
+
+
 package workers
 
 import (
 	"AgriTrace/Internal/EventBus"
+	generic "AgriTrace/Internal/Generic"
+	"database/sql"
 	"fmt"
-	logistic "AgriTrace/Internal/Core/Logistic"
 )
 
-func ListenDynWork(b *event_bus.EventBus, topic string, minWorkers, maxWorkers int) chan []logistic.Effect {
+func ListenDynWork(b *event_bus.EventBus, topic string, minWorkers, maxWorkers int, db *sql.DB) chan event_bus.Event {
 	sub := b.Subscribe(topic)
-	jobs := make(chan []logistic.Effect, 50)
+	jobs := make(chan event_bus.Event, 50)
 
 	// Initial workers
 	active := 0
 	for active < minWorkers {
-		go dynWorker(jobs)
+		go dynWorker(jobs, db)
 		active++
 	}
 
 	// dispatcher
 	go func(active, max int) {
 		for event := range sub {
-			effects := event.Payload.([]logistic.Effect)
-
 			select {
-			case jobs <- effects:
+			case jobs <- event:
 				// OK
 			default:
 				if active < max {
-					go dynWorker(jobs)
+					go dynWorker(jobs, db)
 					active++
-					jobs <- effects
+					jobs <- event
 				} else {
 					fmt.Println("[DYN] OVERLOAD: MAX WORKER REACHED")
 				}
@@ -40,16 +96,21 @@ func ListenDynWork(b *event_bus.EventBus, topic string, minWorkers, maxWorkers i
 	return jobs
 }
 
-func dynWorker(jobs <-chan []logistic.Effect) {
-	for effects := range jobs {
-		for _, e := range effects {
-			if err := handleEffect(e); err != nil {
-				fmt.Println("[DYNAMIC WORKER] error:", err)
+func dynWorker(jobs <-chan event_bus.Event, db *sql.DB) {
+	for event := range jobs {
+		payload, ok := event.Payload.([]generic.Effect)
+		if ok {
+			for _, e := range payload {
+				if err := handleEffect(e, db)(); err != nil {
+					fmt.Println("[DYNAMIC WORKER] error:", err)
+				}
+				fmt.Println("Running work, work id:", event.WorkId)
 			}
+		}else{
+			fmt.Println("Fatal Error, In DynWorkers")
 		}
 	}
 }
-
 
 // func ListenDynWork(b *event_bus.EventBus, topic string, min_workers, max_workers int) chan func() error{
 // 	sub := b.Subscribe(topic)
