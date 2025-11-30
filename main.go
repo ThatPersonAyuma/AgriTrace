@@ -14,6 +14,7 @@ import (
 )
 
 func main() {
+	// eventBus := event_bus.NewEventBus(300,3,16)
 	eventBus := event_bus.NewEventBus()
 	mux := http.NewServeMux()
 	connStr := "user=postgres password=tIdakIngat dbname=AgriTrace sslmode=disable"

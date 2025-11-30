@@ -10,6 +10,10 @@ const (
 	OrderShipped = "Shipped"
 	OrderDelivered = "Delivered"
 	OrderCompleted = "Completed"
+
+	ProductListed = "Listed"
+	ProductUnlisted = "Unlisted"
+	SerachProduct = "Search"
 )
 type OrderIDReq struct{
 	OrderID int `json:"order_id"`
@@ -24,4 +28,10 @@ type OrderCoordinateReq struct{
 	OrderID int `json:"order_id"`
 	Lat float64 `json:"lat"`
 	Long float64 `json:"long"`
+}
+
+type SerachKeyword struct{
+	Keyword string `json:"keyword"`
+}
+type Nothing struct{
 }

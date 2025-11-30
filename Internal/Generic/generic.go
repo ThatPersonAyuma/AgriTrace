@@ -11,7 +11,7 @@ type UserLogin struct{
 
 type Result[T any] struct{
 	Value T
-	Effect func() error
+	Err error
 }
 
 type JobResult struct {
@@ -59,13 +59,14 @@ type Effect struct {
     EcexCommand string
     Args  []any
     Msg   string
-	Fn	  func() error
+	Fn	  func() Result[any]
 }
 
 type EffectType int
 
 const (
     EffectDB EffectType = iota
+	EffectDBQuery
     EffectLog
     EffectNotify
     EffectEmail
