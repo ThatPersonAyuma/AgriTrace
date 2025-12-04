@@ -17,13 +17,13 @@ func handleEffect(e generic.Effect, db *sql.DB) func() generic.Result[any] {
 
     case generic.EffectDB:
         return func() generic.Result[any] {
-            _, err := db.Exec(e.EcexCommand, e.Args...)
+            _, err := db.Exec(e.ExecCommand, e.Args...)
             return generic.Result[any]{Value: nil, Err: err}
         }
 
     case generic.EffectDBQuery:
         return func() generic.Result[any] {
-            rows, err := db.Query(e.EcexCommand, e.Args...)
+            rows, err := db.Query(e.ExecCommand, e.Args...)
             if err != nil {
                 return generic.Result[any]{Err: err}
             }
@@ -79,140 +79,73 @@ func RowsToMaps(rows *sql.Rows) ([]map[string]any, error) {
 
     return results, nil
 }
+func ListenFixWorks(
+    b *event_bus.EventBus,
+    topic string,
+    workers int,
+    db *sql.DB,
+    job_store *generic.JobStore,
+) chan event_bus.Event {
 
-func ListenFixWorks(b *event_bus.EventBus, topic string, workers int, db *sql.DB, job_store *generic.JobStore) chan event_bus.Event {
-	sub := b.Subscribe(topic)
-	jobs := make(chan event_bus.Event, 50)
-	
-	go func() {
-		for event := range sub {
-			jobs <- event
-		}
-	}()
+    sub := b.Subscribe(topic)
+    jobs := make(chan event_bus.Event, 50)
 
-	for i := 0; i < workers; i++ {
-		go func(id int, db *sql.DB) {
-			for event := range jobs {
-				// fmt.Printf("Fix Workers, id: %s", event.WorkId)
+    // Forward subscriber → jobs
+    go func() {
+        defer close(jobs)
+        for event := range sub {
+            jobs <- event
+        }
+    }()
 
-				effects, ok := event.Payload.([]generic.Effect)
-				if !ok {
-					// Jika payload bukan efek, tandai error saja
-					job_store.Lock()
-					job_store.Data[event.WorkId] = generic.JobResult{
-						Status: "error",
-						Error:  "invalid effect payload",
-					}
-					job_store.Unlock()
-					continue
-				}
+    // Launch worker pool
+    for i := 0; i < workers; i++ {
+        go func(id int) {
+            for event := range jobs {
 
-				var finalResult any
-				var finalErr error
+                effects, ok := event.Payload.([]generic.Effect)
+                if !ok {
+                    job_store.Lock()
+                    job_store.Data[event.WorkId] = generic.JobResult{
+                        Status: "error",
+                        Error:  "invalid effect payload",
+                    }
+                    job_store.Unlock()
+                    continue
+                }
 
-				// Jalankan semua efek
-				for _, ef := range effects {
-					result := handleEffect(ef, db)()
-					if result.Err != nil {
-						finalErr = result.Err
-						break // langsung stop jika error
-					}
-					finalResult = result.Value
-				}
+                var finalValue any
+                var finalErr error
 
-				// Simpan hasil (1x saja!)
-				job_store.Lock()
-				if finalErr != nil {
-					job_store.Data[event.WorkId] = generic.JobResult{
-						Status: "error",
-						Error:  finalErr.Error(),
-					}
-				} else {
-					job_store.Data[event.WorkId] = generic.JobResult{
-						Status: "done",
-						Result: map[string]any{
-							"data": finalResult,
-						},
-						Error: "",
-					}
-				}
-				job_store.Unlock()
-			}
-		}(i, db)
-	}
-	return jobs
+                // Execute effects sequentially
+                for _, ef := range effects {
+                    result := handleEffect(ef, db)()
+
+                    if result.Err != nil {
+                        finalErr = result.Err
+                        break
+                    }
+                    finalValue = result.Value
+                }
+
+                // Save final result ONCE
+                job_store.Lock()
+                if finalErr != nil {
+                    job_store.Data[event.WorkId] = generic.JobResult{
+                        Status: "error",
+                        Error:  finalErr.Error(),
+                    }
+                } else {
+                    job_store.Data[event.WorkId] = generic.JobResult{
+                        Status: "done",
+                        Result: map[string]any{"data": finalValue},
+                        Error:  "",
+                    }
+                }
+                job_store.Unlock()
+            }
+        }(i)
+    }
+
+    return jobs
 }
-
-
-
-// func ListenFixWorks(b *event_bus.EventBus, topic string, workers int, db *sql.DB, job_store *generic.JobStore) chan event_bus.Event {
-// 	sub := b.Subscribe(topic)
-// 	jobs := make(chan event_bus.Event, 50)
-
-// 	for i := 0; i < workers; i++ {
-// 		go func(id int, db *sql.DB) {
-// 			for event := range jobs {
-// 				fmt.Printf("Fix Workers, id: %s", event.WorkId)
-// 				effects, is_effect :=  event.Payload.([]generic.Effect)
-// 				if (!is_effect){
-
-// 				}else{
-// 					for _, ef := range effects {
-// 						result := handleEffect(ef, db)()
-
-// 						job_store.Lock()
-// 						job_store.Data[event.WorkId] = generic.JobResult{
-// 							Status: "done",
-// 							Result: map[string]any{
-// 								"data": result.Value,
-// 							},
-// 							Error: "",
-// 						}
-// 						job_store.Unlock()
-
-// 						if result.Err != nil {
-// 							job_store.Data[event.WorkId] = generic.JobResult{
-// 								Status: "error",
-// 								Error:  result.Err.Error(),
-// 							}
-// 						}else{
-
-// 						}
-// 					}
-// 				}
-// 			}
-// 		}(i, db)
-// 	}
-
-// 	go func() {
-// 		for event := range sub {
-// 			jobs <- event
-// 		}
-// 		close(jobs)
-// 	}()
-
-// 	return jobs
-// }
-
-// func ListenFixWorks(b *event_bus.EventBus, topic string, workers int) chan func() error{
-// 	sub := b.Subscribe(topic)
-// 	jobs := make(chan func() error, 50) // Jobs Query
-
-// 	for i:=0;i<workers;i++{
-// 		go func(id int) {
-//             for job := range jobs {
-//                 if err := job(); err != nil {
-//                     fmt.Printf("worker %d, error: %s", id, err)
-//                 }
-//             }
-//         }(i)
-// 	}
-
-// 	go func(){
-// 		for event := range sub {
-// 			jobs <- event.Payload.(func() error)
-// 		}
-// 		close(jobs)
-// 	}()
-// 	return jobs
-// }

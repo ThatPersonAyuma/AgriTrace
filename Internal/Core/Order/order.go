@@ -10,7 +10,7 @@ import (
 
 // {
 // 	Type: generic.EffectDB,
-// 	EcexCommand: `
+// 	ExecCommand: `
 // 		INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, notes)
 // 		VALUES ($1, $2, $3, $4, $5, $6)
 // 	`,
@@ -20,7 +20,7 @@ func OrderCreated(buyerID int, totalPrice float32, now time.Time) []generic.Effe
 	return []generic.Effect{
 		{
 			Type: generic.EffectDB,
-			EcexCommand: `
+			ExecCommand: `
 				INSERT INTO orders (buyer_id, status, total_price, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $4)
 			`,
@@ -33,7 +33,7 @@ func OrderPaid(orderID int, now time.Time) []generic.Effect {
 	return []generic.Effect{
 		{
 			Type: generic.EffectDB,
-			EcexCommand: `
+			ExecCommand: `
 				UPDATE orders
 				SET status = $1,
 					updated_at = $2
@@ -51,7 +51,7 @@ func OrderCanceled(orderID int, now time.Time) []generic.Effect {
 	return []generic.Effect{
 		{
 			Type: generic.EffectDB,
-			EcexCommand: `
+			ExecCommand: `
 				UPDATE orders
 				SET status = $1,
 					updated_at = $2
@@ -65,7 +65,7 @@ func OrderConfirmedByFarmer(orderID int, now time.Time) []generic.Effect {
 	return []generic.Effect{
 		{
 			Type: generic.EffectDB,
-			EcexCommand: `
+			ExecCommand: `
 				UPDATE orders
 				SET status = $1,
 					updated_at = $2
@@ -79,7 +79,7 @@ func OrderPrepared(orderID int, now time.Time) []generic.Effect {
 	return []generic.Effect{
 		{
 			Type: generic.EffectDB,
-			EcexCommand: `
+			ExecCommand: `
 				UPDATE orders
 				SET status = $1,
 					updated_at = $2
@@ -94,7 +94,7 @@ func OrderShipped(orderID int, now time.Time, lat, long float64) []generic.Effec
 		// Checkpoint START
 		{
 			Type: generic.EffectDB,
-			EcexCommand: `
+			ExecCommand: `
 				INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, type, notes)
 				VALUES ($1, $2, $3, $4, $5, 'START', $6)
 			`,
@@ -104,7 +104,7 @@ func OrderShipped(orderID int, now time.Time, lat, long float64) []generic.Effec
 		// Update orders
 		{
 			Type: generic.EffectDB,
-			EcexCommand: `
+			ExecCommand: `
 				UPDATE orders
 				SET status = $1,
 					start_delivery = $2,
@@ -120,7 +120,7 @@ func OrderDelivered(orderID int, now time.Time, lat, long float64) []generic.Eff
 		// Checkpoint END
 		{
 			Type: generic.EffectDB,
-			EcexCommand: `
+			ExecCommand: `
 				INSERT INTO checkpoints (order_id, status, timestamp, location_lat, location_long, type, notes)
 				VALUES ($1, $2, $3, $4, $5, 'END', $6)
 			`,
@@ -130,7 +130,7 @@ func OrderDelivered(orderID int, now time.Time, lat, long float64) []generic.Eff
 		// Update order
 		{
 			Type: generic.EffectDB,
-			EcexCommand: `
+			ExecCommand: `
 				UPDATE orders
 				SET status = $1,
 					end_delivery = $2,
@@ -145,7 +145,7 @@ func OrderCompleted(orderID int, now time.Time) []generic.Effect {
 	return []generic.Effect{
 		{
 			Type: generic.EffectDB,
-			EcexCommand: `
+			ExecCommand: `
 				UPDATE orders
 				SET status = $1,
 					updated_at = $2
@@ -156,73 +156,99 @@ func OrderCompleted(orderID int, now time.Time) []generic.Effect {
 	}
 }
 
-func ListenOrder(b *event_bus.EventBus, topic, worker_topic string, job_store *generic.JobStore){
+func ListenOrder(b *event_bus.EventBus, topic, workerTopic string, jobStore *generic.JobStore) {
 	sub := b.Subscribe(topic)
-	go func(job_store *generic.JobStore){
-		for event := range sub{
-			var data []generic.Effect
-			println("listener:", event.WorkId, event.SubTopic)
-			fmt.Printf("%q\n", core.OrderCreated)
-			fmt.Printf("%q\n", event.SubTopic)
-			fmt.Printf("%q\n", "Created")
+
+	go func() {
+		for event := range sub {
+
+			var effects []generic.Effect
+			var err error
+
 			switch event.SubTopic {
-				case core.OrderCreated:
-					println("running case")
-					payload, ok := event.Payload.(core.OrderCreatedReq)
-					if !ok {
-						fmt.Println("Wrong data:", event.Payload)
-						return
-					}
-					data = OrderCreated(payload.BuyerID, 1000.0, time.Now().UTC())
-					println("correct")
-				case core.OrderPaid:
-					payload, ok := event.Payload.(core.OrderIDReq)
-					if !ok {
-						return
-					}
-					data = OrderPaid(payload.OrderID, time.Now().UTC())
-				case core.OrderCancelled:
-					payload, ok := event.Payload.(core.OrderIDReq)
-					if !ok {
-						return
-					}
-					data = OrderCanceled(payload.OrderID, time.Now().UTC())
-				case core.OrderConfirmedByFarmer:
-					payload, ok := event.Payload.(core.OrderIDReq)
-					if !ok {
-						return
-					}
-					data = OrderConfirmedByFarmer(payload.OrderID, time.Now().UTC())
-				case core.OrderPrepared:
-					payload, ok := event.Payload.(core.OrderIDReq)
-					if !ok {
-						return
-					}
-					data = OrderPrepared(payload.OrderID, time.Now().UTC())
-				case core.OrderShipped:
-					payload, ok := event.Payload.(core.OrderCoordinateReq)
-					if !ok {
-						return
-					}
-					data = OrderShipped(payload.OrderID, time.Now().UTC(), payload.Lat, payload.Long)
-				case core.OrderDelivered:
-					payload, ok := event.Payload.(core.OrderCoordinateReq)
-					if !ok {
-						return
-					}
-					data = OrderDelivered(payload.OrderID, time.Now().UTC(), payload.Lat, payload.Long)
-				case core.OrderCompleted:
-					payload, ok := event.Payload.(core.OrderIDReq)
-					if !ok {
-						return
-					}
-					data = OrderCompleted(payload.OrderID, time.Now().UTC())
+
+			case core.OrderCreated:
+				payload, ok := event.Payload.(core.OrderCreatedReq)
+				if !ok {
+					err = fmt.Errorf("invalid payload for OrderCreated")
+				} else {
+					effects = OrderCreated(payload.BuyerID, 1000.0, time.Now().UTC())
+				}
+
+			case core.OrderPaid:
+				payload, ok := event.Payload.(core.OrderIDReq)
+				if !ok {
+					err = fmt.Errorf("invalid payload for OrderPaid")
+				} else {
+					effects = OrderPaid(payload.OrderID, time.Now().UTC())
+				}
+
+			case core.OrderCancelled:
+				payload, ok := event.Payload.(core.OrderIDReq)
+				if !ok {
+					err = fmt.Errorf("invalid payload for OrderCancelled")
+				} else {
+					effects = OrderCanceled(payload.OrderID, time.Now().UTC())
+				}
+
+			case core.OrderConfirmedByFarmer:
+				payload, ok := event.Payload.(core.OrderIDReq)
+				if !ok {
+					err = fmt.Errorf("invalid payload for OrderConfirmedByFarmer")
+				} else {
+					effects = OrderConfirmedByFarmer(payload.OrderID, time.Now().UTC())
+				}
+
+			case core.OrderPrepared:
+				payload, ok := event.Payload.(core.OrderIDReq)
+				if !ok {
+					err = fmt.Errorf("invalid payload for OrderPrepared")
+				} else {
+					effects = OrderPrepared(payload.OrderID, time.Now().UTC())
+				}
+
+			case core.OrderShipped:
+				payload, ok := event.Payload.(core.OrderCoordinateReq)
+				if !ok {
+					err = fmt.Errorf("invalid payload for OrderShipped")
+				} else {
+					effects = OrderShipped(payload.OrderID, time.Now().UTC(), payload.Lat, payload.Long)
+				}
+
+			case core.OrderDelivered:
+				payload, ok := event.Payload.(core.OrderCoordinateReq)
+				if !ok {
+					err = fmt.Errorf("invalid payload for OrderDelivered")
+				} else {
+					effects = OrderDelivered(payload.OrderID, time.Now().UTC(), payload.Lat, payload.Long)
+				}
+
+			case core.OrderCompleted:
+				payload, ok := event.Payload.(core.OrderIDReq)
+				if !ok {
+					err = fmt.Errorf("invalid payload for OrderCompleted")
+				} else {
+					effects = OrderCompleted(payload.OrderID, time.Now().UTC())
+				}
+
+			default:
+				err = fmt.Errorf("unknown order subtopic: %s", event.SubTopic)
 			}
-			// userLogin, ok := event.Payload.(generic.UserLogin)
-			var work_event event_bus.Event
-			work_event.WorkId = event.WorkId
-			work_event.Payload = data
-			b.Publish(worker_topic, work_event)
+
+			if err != nil {
+				jobStore.Lock()
+				jobStore.Data[event.WorkId] = generic.JobResult{
+					Status: "error",
+					Error:  err.Error(),
+				}
+				jobStore.Unlock()
+				continue
+			}
+
+			b.Publish(workerTopic, event_bus.Event{
+				WorkId:  event.WorkId,
+				Payload: effects,
+			})
 		}
-	}(job_store)
+	}()
 }
