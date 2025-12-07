@@ -32,6 +32,8 @@ func main() {
 	// eventBus := event_bus.NewEventBus(300,3,16)
 	eventBus := event_bus.NewEventBus()
 	mux := http.NewServeMux()
+	fs := http.FileServer(http.Dir("uploads"))
+	mux.Handle("/public/uploads/", http.StripPrefix("/public/uploads/", fs))
 	connStr := "user=postgres password=tIdakIngat dbname=AgriTrace sslmode=disable"
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {

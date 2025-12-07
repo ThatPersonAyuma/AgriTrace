@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supplier Portal - Shipment Checkpoint Status</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <style>
+        /* BASE & LAYOUT */
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #007bff 0%, #00d4ff 100%); 
+            margin: 0; 
+            padding: 20px; 
+            min-height: 100vh;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+        }
+
+        /* TYPOGRAPHY & HEADINGS */
+        h1 { text-align: center; color: #333; margin-bottom: 10px; font-size: 2.2em; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 1em; }
+        
+        /* SECTIONS & FORMS */
+        .card-section { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+        }
+        .card-section h2 { 
+            margin-top: 0; 
+            color: #495057; 
+            font-size: 1.4em;
+            border-bottom: 2px solid #007bff; 
+            padding-bottom: 10px;
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #495057; font-size: 0.9em; }
+        input { 
+            width: 100%; padding: 10px; border-radius: 6px; border: 2px solid #dee2e6; 
+            font-size: 14px; transition: border-color 0.3s;
+        }
+        input:focus { outline: none; border-color: #007bff; }
+
+        /* BUTTONS */
+        .btn { 
+            padding: 12px 24px; border-radius: 6px; border: none; cursor: pointer; 
+            font-weight: 600; font-size: 14px; transition: all 0.3s; margin-right: 10px; margin-top: 5px;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-primary:hover { background: #0056b3; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3); }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+
+        /* SHIPMENT INFO & PROGRESS */
+        .shipment-detail {
+            background: white; padding: 15px; border-radius: 8px; 
+            border: 2px solid #007bff; margin-bottom: 20px;
+        }
+        .shipment-detail p { margin: 8px 0; }
+        .progress-bar {
+            background: #e9ecef; border-radius: 10px; height: 30px; 
+            overflow: hidden; margin: 20px 0;
+        }
+        .progress-fill {
+            background: linear-gradient(90deg, #007bff 0%, #00d4ff 100%); 
+            height: 100%; display: flex; align-items: center; justify-content: center; 
+            color: white; font-weight: 600; transition: width 0.5s ease;
+        }
+
+        /* MAP */
+        .map-container { 
+            height: 400px; border-radius: 8px; border: 3px solid #dee2e6; margin-bottom: 15px;
+        }
+
+        /* CHECKPOINT CARD */
+        .checkpoint-card { 
+            background: white; border: 3px solid #dee2e6; padding: 20px; 
+            margin-bottom: 15px; border-radius: 10px; transition: all 0.3s;
+        }
+        .checkpoint-card.completed { border-color: #28a745; background: #f0fff4; }
+        .checkpoint-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .checkpoint-type { 
+            display: inline-block; padding: 6px 14px; border-radius: 20px; 
+            font-size: 0.85em; font-weight: 700; text-transform: uppercase;
+        }
+        .type-START { background: #d4edda; color: #155724; }
+        .type-ONROAD { background: #fff3cd; color: #856404; }
+        .type-END { background: #f8d7da; color: #721c24; }
+
+        /* STATUS BADGES */
+        .status-badge { padding: 6px 14px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }
+        .status-pending { background: #ffc107; color: #856404; }
+        .status-passed { background: #28a745; color: white; } /* Diubah dari status-completed */
+        .status-confirmed { background: #007bff; color: white; } /* Diubah dari status-confirmed */
+
+        /* CARD INFO */
+        .checkpoint-info { color: #6c757d; font-size: 0.9em; margin-top: 10px; border-top: 1px dashed #ced4da; padding-top: 10px; }
+        .checkpoint-info div { margin: 5px 0; }
+        .photo-preview { margin-top: 15px; text-align: center; }
+        .photo-preview img { 
+            max-width: 100%; max-height: 300px; border-radius: 8px; 
+            border: 2px solid #dee2e6; margin-top: 10px;
+        }
+
+        /* UTILITIES & ALERTS */
+        .alert { padding: 12px 20px; border-radius: 6px; margin-bottom: 15px; font-weight: 500; }
+        .alert-error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+        .alert-info { background: #cce5ff; color: #004085; border-left: 4px solid #007bff; }
+        .loading { text-align: center; padding: 40px; color: #007bff; font-size: 1.2em; }
+        .loading-spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%;
+            width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .hidden { display: none !important; } /* Menggunakan !important untuk konsistensi */
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📦 Supplier Portal - Status Pengiriman</h1>
+    <p class="subtitle">Lihat semua status checkpoint dan konfirmasi penerimaan</p>
+
+    <div class="card-section" id="order-input-section">
+        <h2>🔍 Lacak Order ID</h2>
+        <div class="form-group">
+            <label for="order-id-input">Order ID</label>
+            <input type="number" id="order-id-input" placeholder="Masukkan Order ID" value="1">
+        </div>
+        <button class="btn btn-primary" id="load-checkpoints-btn">🔍 Muat Data Checkpoint</button>
+        <div id="status-message" class="hidden"></div>
+    </div>
+
+    <div id="main-content" class="hidden">
+        
+        <div class="card-section">
+            <h2>🚚 Ringkasan Shipment</h2>
+            <div class="shipment-detail">
+                <p><strong>Order ID:</strong> <span id="display-order-id">-</span></p>
+                <p><strong>Total Checkpoint:</strong> <span id="total-checkpoints">-</span></p>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-bar" style="width: 0%;">
+                    0% Complete
+                </div>
+            </div>
+        </div>
+
+        <div class="card-section">
+            <h2>🗺️ Peta Rute Pengiriman</h2>
+            <div class="map-container">
+                <div id="delivery-map" style="height: 100%; width: 100%; border-radius: 8px;"></div>
+            </div>
+        </div>
+
+        <div class="card-section">
+            <h2>📍 Daftar Status Checkpoint</h2>
+            <div id="checkpoints-list"></div>
+        </div>
+        
+        <div class="card-section hidden" id="confirmation-section">
+            <h2>✅ Konfirmasi Pengiriman Akhir</h2>
+            <div class="alert alert-info" id="confirmation-alert">
+                Harap konfirmasi jika Anda telah menerima paket di tujuan akhir.
+            </div>
+            <button class="btn btn-success" id="confirm-delivery-btn">🤝 Konfirmasi Penerimaan</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+/**
+ * REFACTOR LOGIC (JavaScript)
+ * - Encapsulate logic in an IIFE.
+ * - Introduce UIController for DOM manipulation.
+ * - Introduce App for initialization and event handling.
+ */
+(function() {
+    // === CONSTANTS AND SHARED VARS ===
+    const BASE_URL = 'http://localhost:8080';
+    const PUBLIC_URL = `${BASE_URL}/public`;
+    let deliveryMap;
+    let shipmentData = null;
+
+    // === API CLIENT CLASS (Minimal Changes) ===
+    class LogisticAPIClient {
+        constructor(baseURL) {
+            this.baseURL = baseURL;
+        }
+
+        async submitAndPoll(endpoint, payload, options = {}) {
+            const { pollInterval = 1000, maxAttempts = 60, onProgress = null } = options;
+            
+            const submitResponse = await fetch(`${this.baseURL}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (!submitResponse.ok) {
+                throw new Error(`Gagal mengirimkan permintaan: ${submitResponse.statusText}`);
+            }
+
+            const { job_id } = await submitResponse.json();
+            if (onProgress) onProgress({ job_id, status: 'submitted' });
+
+            return this.pollJobStatus(job_id, pollInterval, maxAttempts, onProgress);
+        }
+
+        async pollJobStatus(jobId, pollInterval, maxAttempts, onProgress) {
+            let attempts = 0;
+
+            while (attempts < maxAttempts) {
+                attempts++;
+                if (attempts > 1) await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+                const checkResponse = await fetch(`${this.baseURL}/work/check?id=${jobId}`);
+
+                if (!checkResponse.ok) {
+                    throw new Error(`Gagal memeriksa status job: ${checkResponse.statusText}`);
+                }
+
+                const data = await checkResponse.json();
+                const { result } = data;
+
+                if (onProgress) onProgress({ job_id: jobId, status: result?.status || 'pending', attempt: attempts });
+
+                if (result?.status === 'done') return result.result;
+                if (result?.status === 'error') throw new Error(result.error || 'Job gagal dengan error tidak dikenal');
+            }
+
+            throw new Error(`Job timeout: melebihi ${maxAttempts} upaya`);
+        }
+
+        decodeCoordinate(base64String) {
+            try {
+                return parseFloat(atob(base64String));
+            } catch (e) {
+                console.error('Gagal mendekode koordinat:', base64String);
+                return 0;
+            }
+        }
+
+        processCheckpoints(data) {
+            if (!data?.data) return { data: [] };
+
+            return {
+                ...data,
+                data: data.data.map(checkpoint => ({
+                    ...checkpoint,
+                    location_lat: this.decodeCoordinate(checkpoint.location_lat),
+                    location_long: this.decodeCoordinate(checkpoint.location_long),
+                    timestamp: checkpoint.timestamp === '0001-01-01T00:00:00Z' 
+                        ? null 
+                        : new Date(checkpoint.timestamp).toLocaleString('id-ID'),
+                    completed: checkpoint.status === 'PASSED' || checkpoint.status === 'CONFIRMED',
+                    confirmed: checkpoint.status === 'CONFIRMED'
+                }))
+            };
+        }
+    }
+    const apiClient = new LogisticAPIClient(BASE_URL);
+
+    // === UI CONTROLLER (Handles all DOM/View updates) ===
+    const UIController = {
+        elements: {
+            orderInputSection: document.getElementById('order-input-section'),
+            mainContent: document.getElementById('main-content'),
+            orderIdInput: document.getElementById('order-id-input'),
+            statusMessage: document.getElementById('status-message'),
+            displayOrderId: document.getElementById('display-order-id'),
+            totalCheckpoints: document.getElementById('total-checkpoints'),
+            progressBar: document.getElementById('progress-bar'),
+            deliveryMapDiv: 'delivery-map', // Pass ID for Leaflet
+            checkpointsList: document.getElementById('checkpoints-list'),
+            confirmationSection: document.getElementById('confirmation-section'),
+            confirmationAlert: document.getElementById('confirmation-alert'),
+            confirmDeliveryBtn: document.getElementById('confirm-delivery-btn')
+        },
+
+        showLoading: (message, jobId = null) => {
+            const statusHtml = jobId 
+                ? `<div class="loading">Job ID: ${jobId}<br>${message}</div>`
+                : `<div class="loading"><div class="loading-spinner"></div>${message}</div>`;
+            UIController.elements.statusMessage.classList.remove('hidden');
+            UIController.elements.statusMessage.innerHTML = statusHtml;
+        },
+
+        hideLoading: () => {
+            UIController.elements.statusMessage.classList.add('hidden');
+        },
+
+        showError: (message) => {
+            UIController.elements.statusMessage.classList.remove('hidden');
+            UIController.elements.statusMessage.innerHTML = `<div class="alert alert-error">❌ ${message}</div>`;
+        },
+
+        showMainContent: (orderId, total) => {
+            UIController.elements.orderInputSection.classList.add('hidden');
+            UIController.elements.mainContent.classList.remove('hidden');
+            UIController.elements.displayOrderId.textContent = orderId;
+            UIController.elements.totalCheckpoints.textContent = total;
+        },
+
+        updateProgress: (checkpoints) => {
+            const total = checkpoints.length;
+            const completed = checkpoints.filter(cp => cp.completed).length;
+            const percentage = Math.round((completed / total) * 100);
+            
+            UIController.elements.progressBar.style.width = percentage + '%';
+            UIController.elements.progressBar.textContent = `${percentage}% Complete (${completed}/${total})`;
+        },
+
+        renderCheckpointsList: (checkpoints) => {
+            let html = '';
+            let onroadCounter = 1;
+            
+            checkpoints.forEach(cp => {
+                let label = cp.type;
+                if (cp.type === 'ONROAD') {
+                    label = `ONROAD #${onroadCounter}`;
+                    onroadCounter++;
+                }
+                console.log(cp)
+                console.log(atob(cp.photos))
+                const arr = JSON.parse(atob(cp.photos));
+                
+                const statusClass = cp.status === 'CONFIRMED' ? 'status-confirmed' : (cp.status === 'PASSED' ? 'status-passed' : 'status-pending');
+                const photoHtml = atob(cp.photos) != [] 
+                    ? `<div class="photo-preview">
+                            <strong>Bukti Foto:</strong><br>
+                            <a href="${PUBLIC_URL +decodeURIComponent(arr[0])}" target="_blank">
+                                <img src="${PUBLIC_URL +decodeURIComponent(arr[0])}" alt="Bukti Foto">
+                            </a>
+                        </div>` 
+                    : '';
+                
+                html += `
+                    <div class="checkpoint-card ${cp.completed ? 'completed' : ''}">
+                        <div class="checkpoint-header">
+                            <span class="checkpoint-type type-${cp.type}">${label}</span>
+                            <span class="status-badge ${statusClass}">
+                                ${cp.status === 'CONFIRMED' ? '⭐ Dikonfirmasi' : (cp.status === 'PASSED' ? '✅ Selesai' : '⏳ Pending')}
+                            </span>
+                        </div>
+                        <div class="checkpoint-info">
+                            <div><strong>📍 Lokasi Rencana:</strong> ${cp.location_lat.toFixed(6)}, ${cp.location_long.toFixed(6)}</div>
+                            <div><strong>📝 Detail:</strong> ${cp.notes || '-'}</div>
+                            ${cp.completed ? `
+                                <div><strong>⏰ Waktu Selesai:</strong> ${cp.timestamp}</div>
+                                <div><strong>💬 Catatan Staf:</strong> ${cp.staff_notes || '-'}</div>
+                                ${photoHtml}
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            UIController.elements.checkpointsList.innerHTML = html;
+            UIController.updateProgress(checkpoints);
+        },
+
+        initDeliveryMap: (checkpoints) => {
+            if (deliveryMap) {
+                deliveryMap.remove();
+            }
+
+            const firstCp = checkpoints[0];
+            deliveryMap = L.map(UIController.elements.deliveryMapDiv).setView([firstCp.location_lat, firstCp.location_long], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(deliveryMap);
+            
+            UIController.drawCheckpointsOnMap(checkpoints);
+        },
+
+        drawCheckpointsOnMap: (checkpoints) => {
+            // Clear existing markers/lines
+            if (deliveryMap) {
+                deliveryMap.eachLayer((layer) => {
+                    if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+                        deliveryMap.removeLayer(layer);
+                    }
+                });
+            }
+
+            const markerColors = {
+                START: 'green', ONROAD: 'orange', END: 'red',
+                PASSED: 'blue', CONFIRMED: 'darkblue'
+            };
+            
+            let onroadCounter = 1;
+            const latlngs = [];
+            
+            checkpoints.forEach(cp => {
+                latlngs.push([cp.location_lat, cp.location_long]);
+                
+                let label = cp.type;
+                if (cp.type === 'ONROAD') {
+                    label = `ONROAD #${onroadCounter}`;
+                    onroadCounter++;
+                }
+                
+                const statusKey = cp.status === 'CONFIRMED' ? 'CONFIRMED' : (cp.status === 'PASSED' ? 'PASSED' : cp.type);
+                const markerColor = markerColors[statusKey] || markerColors[cp.type];
+                
+                const photoHtml = cp.file_name 
+                    ? `<a href="${PUBLIC_URL + cp.file_name}" target="_blank">Lihat Bukti Foto</a>`
+                    : 'Tidak ada foto bukti';
+
+                L.marker([cp.location_lat, cp.location_long], {
+                    icon: L.icon({
+                        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColor}.png`,
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+                    }),
+                    opacity: cp.completed ? 1.0 : 0.7 // Ubah opacity untuk marker yang belum selesai
+                })
+                .bindPopup(`
+                    <strong>${label}</strong><br>
+                    📝: ${cp.notes || 'No notes'}<br>
+                    <strong>Status:</strong> ${cp.status}<br>
+                    <strong>Waktu:</strong> ${cp.timestamp || 'N/A'}<br>
+                    ${photoHtml}
+                `)
+                .addTo(deliveryMap);
+            });
+            
+            // Draw route line
+            if (latlngs.length > 0) {
+                L.polyline(latlngs, { 
+                    color: '#007bff', weight: 4, opacity: 0.7, dashArray: '10, 5'
+                }).addTo(deliveryMap);
+                
+                // Fit bounds
+                const bounds = L.latLngBounds(latlngs);
+                deliveryMap.fitBounds(bounds, { padding: [50, 50] });
+            }
+        },
+
+        checkCompletionStatus: (checkpoints) => {
+            const lastCheckpoint = checkpoints[checkpoints.length - 1];
+            
+            UIController.elements.confirmDeliveryBtn.classList.remove('hidden'); // Reset button visibility
+
+            if (lastCheckpoint && lastCheckpoint.status === 'PASSED') {
+                UIController.elements.confirmationSection.classList.remove('hidden');
+                UIController.elements.confirmationAlert.innerHTML = `
+                    🔔 Checkpoint <strong>${lastCheckpoint.type}</strong> sudah selesai oleh staf pengiriman.
+                    Klik **Konfirmasi Penerimaan** di bawah jika paket sudah Anda terima.
+                `;
+            } else if (lastCheckpoint && lastCheckpoint.status === 'CONFIRMED') {
+                UIController.elements.confirmationSection.classList.remove('hidden');
+                UIController.elements.confirmationAlert.innerHTML = `
+                    ⭐ Pengiriman ini telah **Dikonfirmasi** oleh Anda!
+                `;
+                UIController.elements.confirmDeliveryBtn.classList.add('hidden');
+            } else {
+                UIController.elements.confirmationSection.classList.add('hidden');
+            }
+        }
+    };
+
+
+    // === APPLICATION CONTROLLER (Handles business logic and flow) ===
+    const App = {
+        init: () => {
+            document.getElementById('load-checkpoints-btn').addEventListener('click', App.loadOrderCheckpoints);
+            document.getElementById('confirm-delivery-btn').addEventListener('click', App.confirmDelivery);
+            console.log('Aplikasi Supplier Portal dimulai.');
+        },
+
+        loadOrderCheckpoints: async () => {
+            const orderId = parseInt(UIController.elements.orderIdInput.value);
+            
+            if (!orderId || orderId <= 0) {
+                UIController.showError('Masukkan Order ID yang valid!');
+                return;
+            }
+
+            UIController.showLoading('Memuat data checkpoint...');
+
+            try {
+                const result = await apiClient.submitAndPoll(
+                    '/logistic/getWithPhotos',
+                    { order_id: orderId },
+                    {
+                        pollInterval: 500,
+                        maxAttempts: 120,
+                        onProgress: (progress) => {
+                            let message = '';
+                            if (progress.status === 'submitted') {
+                                message = `Menunggu response...`;
+                            } else {
+                                message = `Polling... (upaya ${progress.attempt})`;
+                            }
+                            UIController.showLoading(message, progress.job_id);
+                        }
+                    }
+                );
+
+                const processed = apiClient.processCheckpoints(result);
+                
+                if (!processed.data || processed.data.length === 0) {
+                    UIController.showError('Tidak ada checkpoint ditemukan untuk order ini!');
+                    return;
+                }
+
+                shipmentData = { orderId: orderId, checkpoints: processed.data };
+
+                UIController.showMainContent(shipmentData.orderId, shipmentData.checkpoints.length);
+                UIController.initDeliveryMap(shipmentData.checkpoints);
+                UIController.renderCheckpointsList(shipmentData.checkpoints);
+                UIController.checkCompletionStatus(shipmentData.checkpoints);
+
+            } catch (error) {
+                UIController.showError(`Error: ${error.message}`);
+            } finally {
+                UIController.hideLoading();
+            }
+        },
+
+        confirmDelivery: async () => {
+            if (!shipmentData) return;
+
+            const lastCheckpoint = shipmentData.checkpoints[shipmentData.checkpoints.length - 1];
+            
+            if (lastCheckpoint.status !== 'PASSED') {
+                alert('Checkpoint terakhir belum diselesaikan oleh staf pengiriman.');
+                return;
+            }
+
+            if (!confirm('Apakah Anda yakin ingin mengkonfirmasi penerimaan paket ini?')) {
+                return;
+            }
+            
+            UIController.showLoading('Mengkonfirmasi pengiriman...');
+
+            try {
+                const result = await apiClient.submitAndPoll(
+                    '/logistic/confirm',
+                    { order_id: shipmentData.orderId, checkpoint_id: lastCheckpoint.id },
+                    { pollInterval: 500, maxAttempts: 60 }
+                );
+                
+                if (result.success) { // Asumsi API mengembalikan {success: true}
+                    // Update status lokal
+                    lastCheckpoint.status = 'CONFIRMED';
+                    lastCheckpoint.confirmed = true;
+                    
+                    alert('🎉 Konfirmasi penerimaan berhasil! Pengiriman selesai.');
+                    
+                    // Render ulang UI
+                    UIController.renderCheckpointsList(shipmentData.checkpoints);
+                    UIController.initDeliveryMap(shipmentData.checkpoints); // Re-draw map to update marker color
+                    UIController.checkCompletionStatus(shipmentData.checkpoints);
+                } else {
+                    throw new Error('Konfirmasi gagal dari server.');
+                }
+
+
+            } catch (error) {
+                alert('❌ Gagal konfirmasi: ' + error.message);
+            } finally {
+                UIController.hideLoading();
+            }
+        }
+    };
+
+    // Initialize the application
+    window.addEventListener('load', App.init);
+})();
+</script>
+
+</body>
+</html>

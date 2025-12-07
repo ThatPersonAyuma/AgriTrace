@@ -228,6 +228,10 @@ pre {
             <input type="hidden" id="productID">
             <div class="form-group">
                 <div>
+                    <label for="farmerId">Farmer ID:</label>
+                    <input type="number" id="createFarmerID">
+                </div>
+                <div>
                     <label for="productName">Product Name:</label>
                     <input type="text" id="productName">
                 </div>
@@ -242,6 +246,10 @@ pre {
                 <div>
                     <label for="productStock">Stock:</label>
                     <input type="number" id="productStock">
+                </div>
+                <div>
+                    <label for="minOrder">Minimal Order:</label>
+                    <input type="number" id="minOrder">
                 </div>
                 <button onclick="createProduct()" class="btn-primary">Add Product</button>
                 <button onclick="updateProduct()" class="btn-primary">Update Product</button>
@@ -287,30 +295,56 @@ async function listProducts() {
     if (!farmerID) return alert("Enter Farmer ID");
 
     try {
-        const res = await fetch(`${apiBase}/list`, {
+        // Request job
+        const res = await fetch(`http://localhost:8080/product/farmer`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ farmer_id: farmerID })
         });
+
         const json = await res.json();
         showOutput(json);
-        populateTable(json);
+
+        if (!json.job_id) {
+            return alert("Server tidak mengembalikan job_id");
+        }
+
+        const jobId = json.job_id;
+        console.log(jobId)
+        // Start polling
+        showOutput({ status: "processing", job_id: jobId });
+
+        const products = await pollJobStatus(
+            jobId,
+            1000,
+            60,
+            (progress) => {
+                document.getElementById("output").textContent =
+                    "Loading product list... " + progress;
+            }
+        );
+
+        // Hasil polling harus berupa array produk
+        populateTable(products);
+
     } catch (err) {
         showOutput({ error: err.message });
     }
 }
 
+
 // Populate HTML table (Modified to include data-labels for mobile view)
 function populateTable(products) {
     const tbody = document.querySelector("#productTable tbody");
     tbody.innerHTML = "";
+
     products.forEach(p => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td data-label="ID">${p.id}</td>
             <td data-label="Name">${p.name}</td>
             <td data-label="Description">${p.description}</td>
-            <td data-label="Price">$${p.price.toFixed(2)}</td>
+            <td data-label="Price">$${Number(atob(p.price)).toFixed(2)}</td>
             <td data-label="Stock">${p.stock}</td>
             <td data-label="Actions">
                 <button onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${p.description.replace(/'/g, "\\'")}', ${p.price}, ${p.stock})" class="action-btn btn-secondary">Edit</button>
@@ -320,6 +354,7 @@ function populateTable(products) {
         tbody.appendChild(tr);
     });
 }
+
 
 // Prefill edit form (Added escaping for ' in product names/desc)
 function editProduct(id, name, desc, price, stock) {
@@ -332,27 +367,91 @@ function editProduct(id, name, desc, price, stock) {
 
 // Create product
 async function createProduct() {
-    const farmerID = parseInt(document.getElementById("farmerID").value);
-    const name = document.getElementById("productName").value;
-    const desc = document.getElementById("productDesc").value;
-    const price = parseFloat(document.getElementById("productPrice").value);
-    const stock = parseInt(document.getElementById("productStock").value);
+    const farmerID = parseInt(document.getElementById("createFarmerID").value);
+    const name = document.getElementById("productName").value || "";
+    const desc = document.getElementById("productDesc").value || "";
+    const price = parseFloat(document.getElementById("productPrice").value || "0");
+    const stock = parseInt(document.getElementById("productStock").value || "0");
+    const minOrder = parseInt(document.getElementById("minOrder").value || "1");
 
-    if (!farmerID || !name) return alert("Farmer ID and Name are required");
+    if (!farmerID || !name) {
+        return alert("Farmer ID dan Product Name wajib diisi.");
+    }
 
     try {
-        const res = await fetch(`${apiBase}/create`, {
+        // --- STEP 1: SEND REQUEST ---
+        const res = await fetch(`http://localhost:8080/product/create`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ farmer_id: farmerID, name, description: desc, price, stock })
+            body: JSON.stringify({
+                farmer_id: farmerID,
+                name,
+                description: desc,
+                price,
+                stock,
+                min_order: minOrder
+            })
         });
+
         const json = await res.json();
         showOutput(json);
+
+        if (!json.job_id) {
+            alert("Unexpected response: job_id not found!");
+            return;
+        }
+
+        const jobId = json.job_id;
+
+        // --- STEP 2: POLL JOB STATUS ---
+        showOutput({ status: "processing", job_id: jobId });
+
+        const resultUrl = await pollJobStatus(
+            jobId,
+            1000,
+            60,
+            (status) => {
+                document.getElementById("output").textContent =
+                    "Job Status: " + status + "\nJob ID: " + jobId;
+            }
+        );
+
+        // --- STEP 3: JOB DONE ---
+        document.getElementById("output").textContent =
+            "Product created!\nFile: " + (resultUrl ?? "No file");
+
+        // Refresh table
         listProducts();
+
     } catch (err) {
         showOutput({ error: err.message });
     }
 }
+async function pollJobStatus(jobId, intervalMs, maxTries, onProgress) {
+    for (let i = 0; i < maxTries; i++) {
+        const res = await fetch(`http://localhost:8080/work/check?id=${jobId}`);
+        const data = await res.json();
+
+        const result = data.result || {};
+        const status = result.status || "processing";
+
+        onProgress(status);
+        console.log(status)
+        if (status === "done") {
+            return result.result.data;   // ← isi array product
+        }
+
+        if (status === "error") {
+            throw new Error(result.error || "Unknown worker error");
+        }
+
+        await new Promise(r => setTimeout(r, intervalMs));
+    }
+
+    throw new Error("Job polling timeout");
+}
+
+
 
 // Update product
 async function updateProduct() {

@@ -22,6 +22,20 @@ func ProductListed() []generic.Effect {
 		},
 	}
 }
+func FarmerProductListed(farmer_id int) []generic.Effect {
+	return []generic.Effect{
+		{
+			Type: generic.EffectDBQuery,
+			ExecCommand: `
+				SELECT id, farmer_id, name, description, price, stock, min_order, updated_at
+				FROM products
+				WHERE farmer_id = $1
+				ORDER BY name ASC
+			`,
+			Args: []any{farmer_id},
+		},
+	}
+}
 
 func ProductUnlisted() []generic.Effect {
 	return []generic.Effect{
@@ -55,12 +69,12 @@ func SearchPerformed(keywords string) []generic.Effect {
 		},
 	}
 }
-func CreateProduct(farmerID int, name, description string, price float64, stock int) generic.Effect {
-	return generic.Effect{
+func CreateProduct(farmerID int, name, description string, price float64, stock, min_order int) []generic.Effect {
+	return []generic.Effect{{
 		Type: generic.EffectDBQuery,
 		ExecCommand: `
-			INSERT INTO products (farmer_id, name, description, price, stock)
-			VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO products (farmer_id, name, description, price, stock, min_order)
+			VALUES ($1, $2, $3, $4, $5, $6)
 			RETURNING id
 		`,
 		Args: []any{
@@ -69,8 +83,9 @@ func CreateProduct(farmerID int, name, description string, price float64, stock 
 			description,
 			price,
 			stock,
+			min_order,
 		},
-	}
+	}}
 }
 
 func ListenProduct(b *event_bus.EventBus, topic, worker_topic string, job_store *generic.JobStore) {
@@ -95,6 +110,31 @@ func ListenProduct(b *event_bus.EventBus, topic, worker_topic string, job_store 
 					err = fmt.Errorf("invalid payload for SearchProduct")
 				} else {
 					effects = SearchPerformed(payload.Keyword)
+				}
+
+			case core.ProductCreated:
+				payload, ok := event.Payload.(core.ProductCreatedReq)
+				if !ok {
+					err = fmt.Errorf("invalid payload for SearchProduct")
+				}else{
+					effects = CreateProduct(
+						payload.FarmerID,
+						payload.Name,
+						payload.Description,
+						payload.Price,
+						payload.Stock,
+						payload.MinOrder,
+					)
+				}
+
+			case core.FarmerProducts:
+				payload, ok := event.Payload.(core.FarmeIdReq)
+				if !ok {
+					err = fmt.Errorf("invalid payload for FarmerProducts")
+				}else{
+					effects = FarmerProductListed(
+						payload.FarmerID,
+					)
 				}
 
 			default:
