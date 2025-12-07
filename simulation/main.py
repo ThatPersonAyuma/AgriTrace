@@ -23,6 +23,9 @@ def order():
 @app.route('/product')
 def product():
     return render_template('product.html')
+@app.route('/check/checkpoint')
+def checkpoint():
+    return render_template('comfirm_checkpoint.html')
 # API endpoint untuk create shipment
 # @app.route('/logistic/create', methods=['POST'])
 # def create_shipment():

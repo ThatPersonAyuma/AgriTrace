@@ -1,8 +1,6 @@
 package core
 
 import (
-	"encoding/json"
-	"fmt"
 	"time"
 )
 
@@ -17,10 +15,13 @@ const (
 	OrderShipped           = "Shipped"
 	OrderDelivered         = "Delivered"
 	OrderCompleted         = "Completed"
+	AddToCart			   = "AddItem"
 
 	ProductListed   = "Listed"
 	ProductUnlisted = "Unlisted"
 	SerachProduct   = "Search"
+	ProductCreated = "Created"
+	FarmerProducts = "FarmerProducts"
 
 	ShipmentCreated         = "ShipmentCreated"
 	GetShipment             = "GetShipment"
@@ -29,6 +30,7 @@ const (
 	CheckpointVerified      = "CheckpointVerified"
 	ShipmentCompleted       = "ShipmentCompleted"
 	ShipmentDelayed         = "ShipmentDelayed"
+	GetShipmentWithImage	= "GetShipmentWImg"
 
 	AccountCreated = "Created"
 	AccountUpdated = "Updated"
@@ -39,8 +41,7 @@ type OrderIDReq struct {
 }
 type OrderCreatedReq struct {
 	BuyerID int `json:"buyer_id"`
-	// StaffID int 	`json:"_staff_id"`
-
+	TotalPrice float32 `json:"total_price"`
 }
 
 type OrderCoordinateReq struct {
@@ -118,25 +119,6 @@ type ShipmentCreatedReq struct {
 	Checkpoints     []Checkpoint `json:"checkpoints"`
 }
 
-func (ct *CheckpointType) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-
-	switch CheckpointType(s) {
-	case CheckpointStart, CheckpointOnRoad, CheckpointEnd:
-		*ct = CheckpointType(s)
-		return nil
-	default:
-		return fmt.Errorf("invalid checkpoint type: %s", s)
-	}
-}
-
-func (ct CheckpointType) MarshalJSON() ([]byte, error) {
-	return json.Marshal(string(ct))
-}
-
 type GetOrderCheckpointsReq struct {
 	OrderID int `json:"order_id"`
 }
@@ -144,4 +126,21 @@ type CheckpointPhotoUploadReq struct {
 	CheckpointID int    `json:"checkpoint_id"`
 	Filename     string `json:"filename"`
 	FileData     []byte `json:"file_data"` // Base64 encoded file data
+}
+type ProductCreatedReq struct{
+	FarmerID	int		`json:"farmer_id"`
+	Name		string	`json:"name"`
+	Description	string	`json:"description"`
+	Price		float64	`json:"price"`
+	Stock		int		`json:"stock"`
+	MinOrder	int		`json:"min_order"`
+}
+type FarmeIdReq struct{
+	FarmerID	int		`json:"farmer_id"`
+}
+type AddToCartPayload struct {
+	OrderID   int     `json:"order_id"`
+	ProductID int     `json:"product_id"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unit_price"`
 }

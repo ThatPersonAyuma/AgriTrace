@@ -52,6 +52,217 @@
         padding: 10px;
         border-radius: 4px;
     }
+    /* Global Styles */
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #eef2f7; /* Light background for contrast */
+        color: #333;
+        line-height: 1.6;
+    }
+
+    h1 {
+        background-color: #28a745; /* Brand color header */
+        color: white;
+        padding: 20px;
+        margin: 0 0 20px 0;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+        color: #28a745;
+        border-bottom: 2px solid #e0e0e0;
+        padding-bottom: 10px;
+        margin-top: 0;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .section {
+        background: #ffffff;
+        padding: 20px;
+        margin-bottom: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Smoother shadow */
+    }
+
+    /* Form Styles */
+    .form-group {
+        display: flex;
+        flex-wrap: wrap; /* Allows wrapping on smaller screens */
+        gap: 15px; /* Spacing between form elements */
+        align-items: flex-end; /* Align inputs/buttons */
+        margin-bottom: 15px;
+    }
+
+    label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #555;
+    }
+
+    input[type="text"], input[type="number"] {
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        box-sizing: border-box;
+        transition: border-color 0.3s;
+        min-width: 200px;
+        flex-grow: 1; /* Allows inputs to grow */
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus {
+        border-color: #28a745;
+        outline: none;
+        box-shadow: 0 0 5px rgba(40, 167, 69, 0.3);
+    }
+
+    /* Button Styles */
+    button {
+        padding: 10px 15px;
+        cursor: pointer;
+        border: none;
+        border-radius: 6px;
+        font-weight: bold;
+        transition: background-color 0.3s, transform 0.1s;
+        min-width: 100px;
+    }
+
+    /* Primary Button (Add/Update) */
+    .btn-primary {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #218838;
+        transform: translateY(-1px);
+    }
+
+    /* Secondary Button (Refresh/Edit) */
+    .btn-secondary {
+        background: #007bff;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background: #0069d9;
+    }
+
+    /* Danger Button (Delete) */
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+        margin-left: 5px;
+    }
+
+    .btn-danger:hover {
+        background: #c82333;
+    }
+
+    /* Table Styles */
+    table {
+        width: 100%;
+        border-collapse: separate; /* Use separate for rounded corners/spacing */
+        border-spacing: 0;
+        margin-top: 15px;
+        font-size: 0.9em;
+        overflow: hidden; /* Important for border-radius */
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+
+    th {
+        background-color: #4CAF50; /* A darker green for the header */
+        color: white;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
+    /* Zebra striping for readability */
+    tbody tr:nth-child(even) {
+        background-color: #f8f8f8;
+    }
+
+    /* Hover effect */
+    tbody tr:hover {
+        background-color: #e6f7ff;
+    }
+
+    /* Output Styles */
+    pre {
+        background: #f4f4f4;
+        padding: 15px;
+        border-radius: 6px;
+        white-space: pre-wrap; /* Allows long lines to wrap */
+        word-break: break-all;
+        border: 1px solid #e0e0e0;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    /* Utility to match button styling for actions in the table */
+    .action-btn {
+        padding: 6px 10px;
+        font-size: 0.8em;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .form-group > div {
+            min-width: 100%; /* Full width for input groups on smaller screens */
+        }
+
+        /* Stack buttons vertically */
+        .section button {
+            display: block;
+            width: 100%;
+            margin-right: 0;
+            margin-bottom: 10px;
+        }
+
+        /* Make table rows more like blocks for smaller screens */
+        table, thead, tbody, th, td, tr {
+            display: block;
+        }
+
+        thead tr {
+            position: absolute;
+            top: -9999px;
+            left: -9999px; /* Hide header row */
+        }
+
+        td {
+            border: none;
+            border-bottom: 1px solid #eee;
+            position: relative;
+            padding-left: 50%;
+            text-align: right;
+        }
+
+        td:before {
+            content: attr(data-label);
+            position: absolute;
+            left: 6px;
+            width: 45%;
+            padding-right: 10px;
+            white-space: nowrap;
+            font-weight: bold;
+            text-align: left;
+            color: #555;
+        }
+    }
     </style>
 </head>
 <body>
@@ -64,52 +275,212 @@
         <button onclick="createOrder()">Create Order</button>
     </div>
 
-    <div class="order-actions">
-        <h2>Order Actions</h2>
-        <label>Order ID: <input type="text" id="orderID"/></label>
-        <button onclick="payOrder()">Pay</button>
-        <button onclick="cancelOrder()">Cancel</button>
-        <button onclick="confirmOrder()">Confirm by Farmer</button>
-        <button onclick="prepareOrder()">Prepare</button>
-        <button onclick="shipOrder()">Ship</button>
-        <button onclick="deliverOrder()">Deliver</button>
-        <button onclick="completeOrder()">Complete</button>
+
+    <div class="section">
+    <h2>➕ Add Product to Order</h2>
+
+        <div class="form-group">
+            <div>
+                <label>Order ID</label>
+                <input type="number" id="add_order_id" placeholder="Order ID">
+            </div>
+
+            <div>
+                <label>Product ID</label>
+                <input type="number" id="add_product_id" placeholder="Product ID">
+            </div>
+
+            <div>
+                <label>Quantity</label>
+                <input type="number" id="add_quantity" placeholder="Qty" min="1">
+            </div>
+
+            <div>
+                <label>Unit Price</label>
+                <input type="number" id="add_unit_price" placeholder="Unit Price" step="0.01" min="0">
+            </div>
+
+            <button class="btn-primary" onclick="addProductToOrder()">Add Item</button>
+        </div>
     </div>
 
+    <div class="section">
+        <h2>📦 Product List</h2>
+        <div class="form-group">
+            <button onclick="listProducts()" class="btn-secondary">Refresh List</button>
+        </div>
+        <table id="productTable">
+            <thead>
+                <tr>
+                    <th>ID</th><th>Name</th><th>Description</th><th>Price</th><th>Stock</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
     <div class="output">
         <h2>Output</h2>
         <pre id="output"></pre>
     </div>
 
     <script>
-        const apiBase = "http://localhost:8080/orders"; // sesuaikan endpoint server Go atau Python
+        const apiBase = "http://localhost:8080/order"; // sesuaikan endpoint server Go atau Python
 
 function showOutput(data) {
     document.getElementById("output").textContent = JSON.stringify(data, null, 2);
 }
+async function listProducts() {
 
+    try {
+        // Request job
+        const res = await fetch(`http://localhost:8080/product/listed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({  })
+        });
+
+        const json = await res.json();
+        showOutput(json);
+
+        if (!json.job_id) {
+            return alert("Server tidak mengembalikan job_id");
+        }
+
+        const jobId = json.job_id;
+        console.log(jobId)
+        // Start polling
+        showOutput({ status: "processing", job_id: jobId });
+
+        const products = await pollJobStatus(
+            jobId,
+            1000,
+            60,
+            (progress) => {
+                document.getElementById("output").textContent =
+                    "Loading product list... " + progress;
+            }
+        );
+
+        // Hasil polling harus berupa array produk
+        populateTable(products);
+
+    } catch (err) {
+        showOutput({ error: err.message });
+    }
+}
+function populateTable(products) {
+    const tbody = document.querySelector("#productTable tbody");
+    tbody.innerHTML = "";
+
+    products.forEach(p => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td data-label="ID">${p.id}</td>
+            <td data-label="Name">${p.name}</td>
+            <td data-label="Description">${p.description}</td>
+            <td data-label="Price">$${Number(atob(p.price)).toFixed(2)}</td>
+            <td data-label="Stock">${p.stock}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+async function pollJobStatus(jobId, intervalMs, maxTries, onProgress) {
+    for (let i = 0; i < maxTries; i++) {
+        const res = await fetch(`http://localhost:8080/work/check?id=${jobId}`);
+        const data = await res.json();
+
+        const result = data.result || {};
+        const status = result.status || "processing";
+
+        onProgress(status);
+        console.log(status)
+        if (status === "done") {
+            return result.result.data;   // ← isi array product
+        }
+
+        if (status === "error") {
+            throw new Error(result.error || "Unknown worker error");
+        }
+
+        await new Promise(r => setTimeout(r, intervalMs));
+    }
+
+    throw new Error("Job polling timeout");
+}
 async function createOrder() {
-    const buyerID = document.getElementById("buyerID").value;
+    const buyerID = parseInt(document.getElementById("buyerID").value);
     const totalPrice = parseFloat(document.getElementById("totalPrice").value);
 
-    const data = { buyerID, totalPrice };
+    const data = { buyer_id:buyerID, total_price:totalPrice };
     try {
-        const res = await fetch(`${apiBase}/create`, {
+        const res = await fetch(`${apiBase}-create`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data)
         });
         const json = await res.json();
-        showOutput(json);
+        const jobId = json.job_id;
+        console.log(jobId)
+        showOutput({ status: "processing", job_id: jobId });
+
+        const products = await pollJobStatus(
+            jobId,
+            1000,
+            60,
+            (progress) => {
+                document.getElementById("output").textContent =
+                    "Loading product list... " + progress;
+            }
+        );
+    } catch (err) {
+        showOutput({ error: err.message });
+    }
+}
+async function addProductToOrder() {
+    const orderID = parseInt(document.getElementById("add_order_id").value);
+    const productID = parseInt(document.getElementById("add_product_id").value);
+    const quantity = parseInt(document.getElementById("add_quantity").value);
+    const unitPrice = parseFloat(document.getElementById("add_unit_price").value);
+
+    if (!orderID || !productID || !quantity || !unitPrice) {
+        return alert("Semua field harus diisi!");
+    }
+
+    const data = {
+        order_id: orderID,
+        product_id: productID,
+        quantity: quantity,
+        unit_price: unitPrice
+    };
+
+    try {
+        const res = await fetch(`${apiBase}/add-product`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+
+        const json = await res.json();
+        const jobId = json.job_id;
+        console.log(jobId)
+        showOutput({ status: "processing", job_id: jobId });
+
+        const products = await pollJobStatus(
+            jobId,
+            1000,
+            60,
+            (progress) => {
+                document.getElementById("output").textContent =
+                    "Loading product list... " + progress;
+            }
+        );
+
     } catch (err) {
         showOutput({ error: err.message });
     }
 }
 
-async function payOrder() {
-    const orderID = document.getElementById("orderID").value;
-    await callOrderAction(orderID, "pay");
-}
 
 async function cancelOrder() {
     const orderID = document.getElementById("orderID").value;

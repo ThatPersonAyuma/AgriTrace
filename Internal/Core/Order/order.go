@@ -95,7 +95,7 @@ func OrderShipped(orderID int, now time.Time, lat, long float64) []generic.Effec
 		{
 			Type: generic.EffectDB,
 			ExecCommand: `
-				INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, type, notes)
+				INSERT INTO checkpoints (order_id, status, timestamp, location_lat, location_long, type, notes)
 				VALUES ($1, $2, $3, $4, $5, 'START', $6)
 			`,
 			Args: []any{orderID, "START_SHIPPING", now, lat, long, "Delivery started"},
@@ -155,6 +155,31 @@ func OrderCompleted(orderID int, now time.Time) []generic.Effect {
 		},
 	}
 }
+func AddItemToCart(orderID, productID, quantity int, unitPrice float64) []generic.Effect {
+
+	subtotal := float64(quantity) * unitPrice
+
+	return []generic.Effect{
+		{
+			Type: generic.EffectDB,
+			ExecCommand: `
+				INSERT INTO order_items (order_id, product_id, quantity, unit_price, subtotal)
+				VALUES ($1, $2, $3, $4, $5)
+			`,
+			Args: []any{
+				orderID,
+				productID,
+				quantity,
+				unitPrice,
+				subtotal,
+			},
+		},
+		{
+			Type: generic.EffectLog,
+			Msg:  fmt.Sprintf("Added product %d x %d to order %d", productID, quantity, orderID),
+		},
+	}
+}
 
 func ListenOrder(b *event_bus.EventBus, topic, workerTopic string, jobStore *generic.JobStore) {
 	sub := b.Subscribe(topic)
@@ -172,7 +197,7 @@ func ListenOrder(b *event_bus.EventBus, topic, workerTopic string, jobStore *gen
 				if !ok {
 					err = fmt.Errorf("invalid payload for OrderCreated")
 				} else {
-					effects = OrderCreated(payload.BuyerID, 1000.0, time.Now().UTC())
+					effects = OrderCreated(payload.BuyerID, payload.TotalPrice, time.Now().UTC())
 				}
 
 			case core.OrderPaid:
@@ -230,7 +255,13 @@ func ListenOrder(b *event_bus.EventBus, topic, workerTopic string, jobStore *gen
 				} else {
 					effects = OrderCompleted(payload.OrderID, time.Now().UTC())
 				}
-
+			case core.AddToCart:
+				payload, ok := event.Payload.(core.AddToCartPayload)
+				if !ok {
+					err = fmt.Errorf("invalid payload for AddToCart")
+				} else {
+					effects = AddItemToCart(payload.OrderID, payload.ProductID, payload.Quantity, payload.UnitPrice)
+				}
 			default:
 				err = fmt.Errorf("unknown order subtopic: %s", event.SubTopic)
 			}

@@ -158,10 +158,6 @@ func HandleCheckpointPhotoUploadMultipart(b *event_bus.EventBus, jobStore *gener
 			http.Error(w, "Failed to parse form", http.StatusBadRequest)
 			return
 		}
-		// if err := r.ParseMultipartForm(10 << 20); err != nil {
-		// 	http.Error(w, "Failed to parse form", http.StatusBadRequest)
-		// 	return
-		// }
 
 		// Get checkpoint_id from form
 		checkpointIDStr := r.FormValue("checkpoint_id")
