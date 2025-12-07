@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delivery Staff - Checkpoint Tracking</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+    * { box-sizing: border-box; }
+    body { 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        margin: 0; 
+        padding: 20px; 
+        min-height: 100vh;
+    }
+    .container { 
+        max-width: 1200px; 
+        margin: auto; 
+        background: white; 
+        padding: 30px; 
+        border-radius: 12px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+    }
+    h1 { 
+        text-align: center; 
+        color: #333; 
+        margin-bottom: 10px;
+        font-size: 2em;
+    }
+    .subtitle {
+        text-align: center;
+        color: #666;
+        margin-bottom: 30px;
+        font-size: 0.95em;
+    }
+    .section { 
+        background: #f8f9fa; 
+        padding: 20px; 
+        border-radius: 8px; 
+        margin-bottom: 20px; 
+    }
+    .section h2 { 
+        margin-top: 0; 
+        color: #495057; 
+        font-size: 1.3em;
+        border-bottom: 2px solid #11998e;
+        padding-bottom: 10px;
+    }
+    .form-group { 
+        margin-bottom: 15px; 
+    }
+    label { 
+        display: block; 
+        margin-bottom: 5px; 
+        font-weight: 600; 
+        color: #495057;
+        font-size: 0.9em;
+    }
+    input, select, textarea { 
+        width: 100%; 
+        padding: 10px; 
+        border-radius: 6px; 
+        border: 2px solid #dee2e6; 
+        font-size: 14px;
+        transition: border-color 0.3s;
+    }
+    input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #11998e;
+    }
+    .btn { 
+        padding: 12px 24px; 
+        border-radius: 6px; 
+        border: none; 
+        cursor: pointer; 
+        font-weight: 600;
+        font-size: 14px;
+        transition: all 0.3s;
+        margin-right: 10px;
+        margin-top: 5px;
+    }
+    .btn-primary { 
+        background: #11998e; 
+        color: white; 
+    }
+    .btn-primary:hover { 
+        background: #0e7c6f; 
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(17, 153, 142, 0.3);
+    }
+    .btn-success { 
+        background: #28a745; 
+        color: white; 
+    }
+    .btn-success:hover { 
+        background: #218838; 
+    }
+    .btn-location {
+        background: #17a2b8;
+        color: white;
+        width: 100%;
+        margin-top: 5px;
+    }
+    .btn-location:hover {
+        background: #138496;
+    }
+    .map-container { 
+        height: 500px; 
+        border-radius: 8px; 
+        border: 3px solid #dee2e6;
+        margin-bottom: 15px;
+    }
+    .checkpoint-card { 
+        background: white; 
+        border: 3px solid #dee2e6; 
+        padding: 20px; 
+        margin-bottom: 15px; 
+        border-radius: 10px;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    .checkpoint-card:hover {
+        border-color: #11998e;
+        box-shadow: 0 4px 12px rgba(17, 153, 142, 0.2);
+    }
+    .checkpoint-card.completed {
+        border-color: #28a745;
+        background: #f0fff4;
+    }
+    .checkpoint-card.selected {
+        border-color: #007bff;
+        background: #e7f3ff;
+    }
+    .checkpoint-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .checkpoint-type { 
+        display: inline-block;
+        padding: 6px 14px; 
+        border-radius: 20px; 
+        font-size: 0.85em; 
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    .type-START { 
+        background: #d4edda; 
+        color: #155724; 
+    }
+    .type-ONROAD { 
+        background: #fff3cd; 
+        color: #856404; 
+    }
+    .type-END { 
+        background: #f8d7da; 
+        color: #721c24; 
+    }
+    .status-badge {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+    .status-pending {
+        background: #ffc107;
+        color: #856404;
+    }
+    .status-completed {
+        background: #28a745;
+        color: white;
+    }
+    .checkpoint-info {
+        color: #6c757d;
+        font-size: 0.9em;
+        margin-top: 10px;
+    }
+    .checkpoint-info div {
+        margin: 5px 0;
+    }
+    .photo-preview {
+        margin-top: 15px;
+    }
+    .photo-preview img {
+        max-width: 200px;
+        max-height: 200px;
+        border-radius: 8px;
+        border: 2px solid #dee2e6;
+        margin-top: 10px;
+    }
+    .alert { 
+        padding: 12px 20px; 
+        border-radius: 6px; 
+        margin-bottom: 15px;
+        font-weight: 500;
+    }
+    .alert-info { 
+        background: #d1ecf1; 
+        color: #0c5460; 
+        border-left: 4px solid #17a2b8;
+    }
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border-left: 4px solid #28a745;
+    }
+    .alert-warning {
+        background: #fff3cd;
+        color: #856404;
+        border-left: 4px solid #ffc107;
+    }
+    .alert-error {
+        background: #f8d7da;
+        color: #721c24;
+        border-left: 4px solid #dc3545;
+    }
+    .progress-bar {
+        background: #e9ecef;
+        border-radius: 10px;
+        height: 30px;
+        overflow: hidden;
+        margin: 20px 0;
+    }
+    .progress-fill {
+        background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        transition: width 0.5s ease;
+    }
+    .shipment-info {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        border: 2px solid #11998e;
+        margin-bottom: 20px;
+    }
+    .shipment-info p {
+        margin: 8px 0;
+    }
+    input[type="file"] {
+        padding: 8px;
+        border: 2px dashed #11998e;
+        background: #f0fff9;
+    }
+    .photo-upload-section {
+        background: #f0fff9;
+        padding: 15px;
+        border-radius: 8px;
+        border: 2px solid #11998e;
+        margin-top: 15px;
+    }
+    .hidden {
+        display: none;
+    }
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #11998e;
+        font-size: 1.2em;
+    }
+    .loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #11998e;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .order-input-section {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    @media (max-width: 768px) {
+        .container {
+            padding: 15px;
+        }
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚚 Delivery Staff Portal</h1>
+    <p class="subtitle">Tandai checkpoint yang telah dikunjungi dan upload bukti foto</p>
+
+    <!-- Order Input Section -->
+    <div class="section order-input-section" id="orderInputSection">
+        <h2>📦 Masukkan Order ID</h2>
+        <div class="form-group">
+            <label>Order ID</label>
+            <input type="number" id="orderIdInput" placeholder="Masukkan Order ID" value="1">
+        </div>
+        <button class="btn btn-primary" onclick="loadOrderCheckpoints()">🔍 Muat Data Checkpoint</button>
+        <div id="loadingStatus" class="hidden"></div>
+    </div>
+
+    <!-- Main Content (hidden until data loaded) -->
+    <div id="mainContent" class="hidden">
+        <!-- Shipment Info -->
+        <div class="section">
+            <h2>📦 Informasi Shipment</h2>
+            <div class="shipment-info">
+                <p><strong>Order ID:</strong> <span id="orderId">-</span></p>
+                <p><strong>Total Checkpoint:</strong> <span id="totalCheckpoints">-</span></p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar" style="width: 0%;">
+                    0% Complete
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Section -->
+        <div class="section">
+            <h2>🗺️ Peta Rute Pengiriman</h2>
+            <div class="alert alert-info">
+                Klik pada marker di peta untuk memilih checkpoint yang ingin Anda tandai.
+            </div>
+            <div class="map-container">
+                <div id="deliveryMap" style="height: 100%; width: 100%; border-radius: 8px;"></div>
+            </div>
+            <button class="btn btn-location" onclick="centerOnMyLocation()">📍 Tampilkan Lokasi Saya</button>
+        </div>
+
+        <!-- Checkpoint List -->
+        <div class="section">
+            <h2>📍 Daftar Checkpoint</h2>
+            <div id="checkpointsList"></div>
+        </div>
+
+        <!-- Checkpoint Action Form -->
+        <div class="section hidden" id="checkpointActionSection">
+            <h2>✅ Tandai Checkpoint</h2>
+            <div class="alert alert-warning" id="selectedCheckpointInfo"></div>
+            
+            <div class="form-group">
+                <label>Lokasi Saat Ini</label>
+                <input type="text" id="currentLocation" placeholder="Klik tombol di bawah untuk mendapatkan lokasi" readonly>
+                <button class="btn btn-location" onclick="getCurrentLocation()">📍 Ambil Lokasi Saya</button>
+            </div>
+
+            <div class="photo-upload-section">
+                <div class="form-group">
+                    <label>Upload Foto Bukti *</label>
+                    <input type="file" id="photoUpload" accept="image/*" onchange="previewPhoto()">
+                </div>
+                
+                <div id="photoPreview" class="photo-preview hidden">
+                    <strong>Preview:</strong>
+                    <br>
+                    <img id="previewImage" src="" alt="Photo Preview">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Catatan Tambahan</label>
+                <textarea id="checkpointNotes" rows="3" placeholder="Contoh: Paket diterima oleh penerima langsung, kondisi baik"></textarea>
+            </div>
+
+            <button class="btn btn-success" onclick="markCheckpointComplete()">✓ Tandai Selesai</button>
+            <button class="btn" style="background: #6c757d; color: white;" onclick="cancelCheckpoint()">✕ Batal</button>
+        </div>
+
+        <!-- Completion Section -->
+        <div class="section hidden" id="completionSection">
+            <div class="alert alert-success">
+                🎉 <strong>Selamat!</strong> Semua checkpoint telah diselesaikan. Pengiriman telah selesai!
+            </div>
+            <button class="btn btn-primary" onclick="completeDelivery()">🏁 Selesaikan Pengiriman</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+// API Client for polling-based requests
+class LogisticAPIClient {
+    constructor(baseURL = 'http://localhost:8080') {
+        this.baseURL = baseURL;
+    }
+
+    async submitAndPoll(endpoint, payload, options = {}) {
+        const {
+            pollInterval = 1000,
+            maxAttempts = 60,
+            onProgress = null
+        } = options;
+
+        // Submit job
+        const submitResponse = await fetch(`${this.baseURL}${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!submitResponse.ok) {
+            throw new Error(`Failed to submit job: ${submitResponse.statusText}`);
+        }
+
+        const { job_id } = await submitResponse.json();
+        
+        if (onProgress) {
+            onProgress({ job_id, status: 'submitted' });
+        }
+
+        // Poll for result
+        return this.pollJobStatus(job_id, pollInterval, maxAttempts, onProgress);
+    }
+
+    async pollJobStatus(jobId, pollInterval, maxAttempts, onProgress) {
+        let attempts = 0;
+
+        while (attempts < maxAttempts) {
+            attempts++;
+
+            if (attempts > 1) {
+                await this.sleep(pollInterval);
+            }
+
+            const checkResponse = await fetch(
+                `${this.baseURL}/work/check?id=${jobId}`
+            );
+
+            if (!checkResponse.ok) {
+                throw new Error(`Failed to check job status: ${checkResponse.statusText}`);
+            }
+
+            const data = await checkResponse.json();
+            const { result } = data;
+
+            if (onProgress) {
+                onProgress({ 
+                    job_id: jobId, 
+                    status: result?.status || 'pending',
+                    attempt: attempts 
+                });
+            }
+
+            if (result?.status === 'done') {
+                return result.result;
+            }
+
+            if (result?.status === 'error') {
+                throw new Error(result.error || 'Job failed with unknown error');
+            }
+        }
+
+        throw new Error(`Job timeout: exceeded ${maxAttempts} attempts`);
+    }
+
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    decodeCoordinate(base64String) {
+        try {
+            return parseFloat(atob(base64String));
+        } catch (e) {
+            console.error('Failed to decode coordinate:', base64String);
+            return 0;
+        }
+    }
+
+    processCheckpoints(data) {
+        if (!data?.data) return { data: [] };
+
+        return {
+            ...data,
+            data: data.data.map(checkpoint => ({
+                ...checkpoint,
+                location_lat: this.decodeCoordinate(checkpoint.location_lat),
+                location_long: this.decodeCoordinate(checkpoint.location_long),
+                timestamp: checkpoint.timestamp === '0001-01-01T00:00:00Z' 
+                    ? null 
+                    : new Date(checkpoint.timestamp),
+                completed: false,
+                photo: null,
+                staffNotes: null,
+                actualLocation: null
+            }))
+        };
+    }
+}
+
+// Global variables
+let deliveryMap;
+let selectedCheckpoint = null;
+let userLocation = null;
+let shipmentData = null;
+const apiClient = new LogisticAPIClient('http://localhost:8080');
+
+// Load order checkpoints from API
+async function loadOrderCheckpoints() {
+    const orderIdInput = document.getElementById('orderIdInput');
+    const orderId = parseInt(orderIdInput.value);
+    
+    if (!orderId || orderId <= 0) {
+        showError('Masukkan Order ID yang valid!');
+        return;
+    }
+
+    const loadingStatus = document.getElementById('loadingStatus');
+    loadingStatus.classList.remove('hidden');
+    loadingStatus.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Memuat data checkpoint...</div>';
+
+    try {
+        const result = await apiClient.submitAndPoll(
+            '/logistic/get',
+            { order_id: orderId },
+            {
+                pollInterval: 500,
+                maxAttempts: 120,
+                onProgress: (progress) => {
+                    if (progress.status === 'submitted') {
+                        loadingStatus.innerHTML = `<div class="loading">Job ID: ${progress.job_id}<br>Menunggu response...</div>`;
+                    } else {
+                        loadingStatus.innerHTML = `<div class="loading">Polling... (attempt ${progress.attempt})</div>`;
+                    }
+                }
+            }
+        );
+
+        // Process checkpoints
+        const processed = apiClient.processCheckpoints(result);
+        
+        if (!processed.data || processed.data.length === 0) {
+            showError('Tidak ada checkpoint ditemukan untuk order ini!');
+            return;
+        }
+
+        // Store data
+        shipmentData = {
+            orderId: orderId,
+            checkpoints: processed.data
+        };
+
+        // Hide input section, show main content
+        document.getElementById('orderInputSection').classList.add('hidden');
+        document.getElementById('mainContent').classList.remove('hidden');
+
+        // Update UI
+        document.getElementById('orderId').textContent = orderId;
+        document.getElementById('totalCheckpoints').textContent = shipmentData.checkpoints.length;
+
+        // Initialize map and render
+        initDeliveryMap();
+        renderCheckpointsList();
+
+    } catch (error) {
+        showError('Error: ' + error.message);
+    } finally {
+        loadingStatus.classList.add('hidden');
+    }
+}
+
+function showError(message) {
+    const loadingStatus = document.getElementById('loadingStatus');
+    loadingStatus.classList.remove('hidden');
+    loadingStatus.innerHTML = `<div class="alert alert-error">${message}</div>`;
+}
+
+// Initialize Map
+function initDeliveryMap() {
+    if (deliveryMap) {
+        deliveryMap.remove();
+    }
+
+    deliveryMap = L.map('deliveryMap').setView([-6.2088, 106.8456], 13);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(deliveryMap);
+    
+    drawCheckpointsOnMap();
+}
+
+function drawCheckpointsOnMap() {
+    const markerColors = {
+        START: 'green',
+        ONROAD: 'orange',
+        END: 'red'
+    };
+    
+    const markerIcons = {
+        START: '🟢',
+        ONROAD: '🟠',
+        END: '🔴'
+    };
+    
+    let onroadCounter = 1;
+    
+    shipmentData.checkpoints.forEach(cp => {
+        let label = markerIcons[cp.type] + ' ' + cp.type;
+        if (cp.type === 'ONROAD') {
+            label = `🟠 ONROAD #${onroadCounter}`;
+            onroadCounter++;
+        }
+        
+        const marker = L.marker([cp.location_lat, cp.location_long], {
+            icon: L.icon({
+                iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColors[cp.type]}.png`,
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            }),
+            opacity: cp.completed ? 0.5 : 1.0
+        })
+        .bindPopup(`
+            <strong>${label}</strong><br>
+            ${cp.notes || 'No notes'}<br>
+            <strong>Status:</strong> ${cp.completed ? '✅ Selesai' : '⏳ Belum'}<br>
+            <button onclick="selectCheckpointFromMap(${cp.id})" style="margin-top: 5px; padding: 5px 10px; background: #11998e; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                ${cp.completed ? 'Lihat Detail' : 'Tandai Checkpoint'}
+            </button>
+        `)
+        .addTo(deliveryMap);
+    });
+    
+    // Draw route line
+    const latlngs = shipmentData.checkpoints.map(cp => [cp.location_lat, cp.location_long]);
+    L.polyline(latlngs, { 
+        color: '#11998e', 
+        weight: 4, 
+        opacity: 0.7,
+        dashArray: '10, 5'
+    }).addTo(deliveryMap);
+    
+    // Fit bounds
+    const bounds = L.latLngBounds(latlngs);
+    deliveryMap.fitBounds(bounds, { padding: [50, 50] });
+}
+
+function centerOnMyLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                
+                userLocation = { lat, lng };
+                deliveryMap.setView([lat, lng], 15);
+                
+                L.marker([lat, lng], {
+                    icon: L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    })
+                })
+                .bindPopup('📍 Lokasi Anda')
+                .addTo(deliveryMap)
+                .openPopup();
+            },
+            error => {
+                alert('Gagal mendapatkan lokasi: ' + error.message);
+            }
+        );
+    } else {
+        alert('Geolocation tidak didukung oleh browser Anda.');
+    }
+}
+
+function renderCheckpointsList() {
+    const container = document.getElementById('checkpointsList');
+    
+    let html = '';
+    let onroadCounter = 1;
+    shipmentData.checkpoints.forEach(cp => {
+        if (cp.status === "PASSED") {
+            cp.completed = true;
+        }
+    });
+    shipmentData.checkpoints.forEach(cp => {
+        let label = cp.type;
+        if (cp.type === 'ONROAD') {
+            label = `ONROAD #${onroadCounter}`;
+            onroadCounter++;
+        }
+        
+        
+        html += `
+            <div class="checkpoint-card ${cp.completed ? 'completed' : ''} ${selectedCheckpoint?.id === cp.id ? 'selected' : ''}" 
+                 onclick="selectCheckpoint(${cp.id})">
+                <div class="checkpoint-header">
+                    <span class="checkpoint-type type-${cp.type}">${label}</span>
+                    <span class="status-badge ${cp.completed ? 'status-completed' : 'status-pending'}">
+                        ${cp.completed ? '✅ Selesai' : '⏳ Pending'}
+                    </span>
+                </div>
+                <div class="checkpoint-info">
+                    <div><strong>📍 Lokasi:</strong> ${cp.location_lat.toFixed(6)}, ${cp.location_long.toFixed(6)}</div>
+                    <div><strong>📝 Detail:</strong> ${cp.notes || '-'}</div>
+                    <div><strong>🔖 Status:</strong> ${cp.status}</div>
+                    ${cp.completed ? `
+                        <div><strong>✅ Diselesaikan:</strong> ${cp.completionTime}</div>
+                        <div><strong>💬 Catatan Staff:</strong> ${cp.staffNotes || '-'}</div>
+                        ${cp.photo ? `<div class="photo-preview"><img src="${cp.photo}" alt="Bukti Foto"></div>` : ''}
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+    updateProgress();
+}
+
+function selectCheckpoint(checkpointId) {
+    const checkpoint = shipmentData.checkpoints.find(cp => cp.id === checkpointId);
+    
+    if (!checkpoint) return;
+    
+    if (checkpoint.completed) {
+        alert('Checkpoint ini sudah diselesaikan!');
+        return;
+    }
+    
+    selectedCheckpoint = checkpoint;
+    
+    document.getElementById('checkpointActionSection').classList.remove('hidden');
+    
+    let label = checkpoint.type;
+    if (checkpoint.type === 'ONROAD') {
+        const onroadIndex = shipmentData.checkpoints.filter(cp => 
+            cp.type === 'ONROAD' && cp.id <= checkpoint.id
+        ).length;
+        label = `ONROAD #${onroadIndex}`;
+    }
+    
+    document.getElementById('selectedCheckpointInfo').innerHTML = `
+        📍 Anda akan menandai checkpoint: <strong>${label}</strong> - ${checkpoint.notes || 'No notes'}
+    `;
+    
+    document.getElementById('checkpointActionSection').scrollIntoView({ behavior: 'smooth' });
+    
+    renderCheckpointsList();
+}
+
+function selectCheckpointFromMap(checkpointId) {
+    selectCheckpoint(checkpointId);
+}
+
+function getCurrentLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                const lat = position.coords.latitude.toFixed(6);
+                const lng = position.coords.longitude.toFixed(6);
+                
+                userLocation = { lat: parseFloat(lat), lng: parseFloat(lng) };
+                document.getElementById('currentLocation').value = `${lat}, ${lng}`;
+            },
+            error => {
+                alert('Gagal mendapatkan lokasi: ' + error.message);
+            }
+        );
+    } else {
+        alert('Geolocation tidak didukung oleh browser Anda.');
+    }
+}
+
+function previewPhoto() {
+    const file = document.getElementById('photoUpload').files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('previewImage').src = e.target.result;
+            document.getElementById('photoPreview').classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+async function markCheckpointComplete() {
+    if (!selectedCheckpoint) {
+        alert('Pilih checkpoint terlebih dahulu!');
+        return;
+    }
+
+    const currentLoc = document.getElementById('currentLocation').value;
+    const photoFile = document.getElementById('photoUpload').files[0];
+    const notes = document.getElementById('checkpointNotes').value;
+
+    if (!currentLoc) {
+        alert('Ambil lokasi Anda terlebih dahulu!');
+        return;
+    }
+
+    if (!photoFile) {
+        alert('Upload foto bukti terlebih dahulu!');
+        return;
+    }
+
+    const checkpointId = selectedCheckpoint.id;
+
+    try {
+        // Upload foto via multipart/form-data
+        const photoUrl = await uploadCheckpointPhotoMultipart(checkpointId, photoFile);
+        console.log(photoUrl)
+        // Kirim data checkpoint (lokasi + catatan + photoUrl) ke server
+        
+
+        // if (!response.ok) throw new Error('Gagal menandai checkpoint selesai!');
+
+        // const result = await response.json();
+
+        // Update lokal
+        selectedCheckpoint.completed = true;
+        selectedCheckpoint.completionTime = new Date().toLocaleString('id-ID');
+        selectedCheckpoint.photo = photoUrl;
+        selectedCheckpoint.staffNotes = notes;
+        selectedCheckpoint.actualLocation = currentLoc;
+
+        // Reset form
+        document.getElementById('currentLocation').value = '';
+        document.getElementById('photoUpload').value = '';
+        document.getElementById('checkpointNotes').value = '';
+        document.getElementById('photoPreview').classList.add('hidden');
+        document.getElementById('checkpointActionSection').classList.add('hidden');
+
+        selectedCheckpoint = null;
+
+        renderCheckpointsList();
+
+        // Refresh map
+        deliveryMap.eachLayer(layer => {
+            if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+                deliveryMap.removeLayer(layer);
+            }
+        });
+        drawCheckpointsOnMap();
+
+        alert('✅ Checkpoint berhasil ditandai selesai!');
+        checkAllCompleted();
+
+    } catch (err) {
+        alert('❌ Error: ' + err.message);
+    }
+}
+
+async function uploadCheckpointPhotoMultipart(checkpointId, file) {
+    const formData = new FormData();
+    formData.append('checkpoint_id', checkpointId);
+    formData.append('photo', file);
+
+    const response = await fetch('http://localhost:8080/logistic/checkpoint/upload', {
+        method: 'POST',
+        body: formData
+    });
+
+    const { job_id } = await response.json();
+
+    // Pastikan callback berupa fungsi
+    return await pollJobStatus(job_id, 1000, 60, (progress) => {
+        const statusEl = document.getElementById('status');
+        if (statusEl) statusEl.innerText = `Upload progress: ${progress}`;
+    });
+}
+
+
+async function pollJobStatus(jobId, intervalMs, maxTries, onProgress) {
+    for (let i = 0; i < maxTries; i++) {
+        const res = await fetch(`http://localhost:8080/work/check?id=${jobId}`);
+        const data = await res.json();
+
+        const result = data.result || {};
+        const status = result.status || 'processing';
+
+        onProgress(status);
+
+        if (status === 'done') return result.fileUrl || null;
+        if (status === 'error') throw new Error(result.error || 'Unknown error');
+
+        await new Promise(r => setTimeout(r, intervalMs));
+    }
+    throw new Error('Job polling timeout');
+}
+
+
+function cancelCheckpoint() {
+    selectedCheckpoint = null;
+    document.getElementById('checkpointActionSection').classList.add('hidden');
+    renderCheckpointsList();
+}
+
+function updateProgress() {
+    const total = shipmentData.checkpoints.length;
+    const completed = shipmentData.checkpoints.filter(cp => cp.completed).length;
+    const percentage = Math.round((completed / total) * 100);
+    
+    const progressBar = document.getElementById('progressBar');
+    progressBar.style.width = percentage + '%';
+    progressBar.textContent = `${percentage}% Complete (${completed}/${total})`;
+}
+
+function checkAllCompleted() {
+    const allCompleted = shipmentData.checkpoints.every(cp => cp.completed);
+    
+    if (allCompleted) {
+        document.getElementById('completionSection').classList.remove('hidden');
+        document.getElementById('completionSection').scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+function completeDelivery() {
+    if (confirm('Apakah Anda yakin ingin menyelesaikan pengiriman ini?')) {
+        alert('🎉 Pengiriman telah selesai! Terima kasih atas kerja keras Anda.');
+        
+        // In real app, send completion data to backend
+        console.log('Shipment completed:', shipmentData);
+        
+        // Optionally reload to start new delivery
+        setTimeout(() => {
+            if (confirm('Muat order baru?')) {
+                location.reload();
+            }
+        }, 2000);
+    }
+}
+</script>
+
+</body>
+</html>

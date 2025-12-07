@@ -1,41 +1,117 @@
 package workers
 
 import (
-	"AgriTrace/Internal/EventBus"
+	event_bus "AgriTrace/Internal/EventBus"
+	generic "AgriTrace/Internal/Generic"
+	"database/sql"
 	"fmt"
+	"sync"
+	"time"
 )
 
-func ListenDynWork(b *event_bus.EventBus, topic string, min_workers, max_workers int) chan func() error{
+func ListenDynWork(b *event_bus.EventBus, topic string, minWorkers, maxWorkers int, db *sql.DB, job_result *generic.JobStore) chan event_bus.Event {
 	sub := b.Subscribe(topic)
-	jobs := make(chan func() error, 50) // Jobs Query
-	i:=0
-	for i<min_workers{
-		go worker(jobs)
-		i++
+	jobs := make(chan event_bus.Event, 50)
+
+	var mu sync.Mutex
+	active := 0
+
+	// spawn initial workers
+	for active < minWorkers {
+		go dynWorker(jobs, db, job_result)
+		active++
 	}
-	go func(count, max_count int){
-		for event := range sub{
-			job := event.Payload.(func() error)
+
+	// dispatcher
+	go func() {
+		for event := range sub {
+
+			mu.Lock()
+			canSpawn := active < maxWorkers
+			mu.Unlock()
+
 			select {
-			case jobs <- job:
+			case jobs <- event:
+				// OK, queued
 			default:
-				if count < max_count{
-					go worker(jobs)
-					go func() { jobs <- job }()
-				}else{
-					fmt.Printf("Fatal Too Much Request")
+				// buffer penuh → spawn worker baru kalau bisa
+				if canSpawn {
+					go dynWorker(jobs, db, job_result)
+
+					mu.Lock()
+					active++
+					mu.Unlock()
+
+					jobs <- event
+				} else {
+					fmt.Println("[DYN] OVERLOAD: MAX WORKER REACHED")
 				}
 			}
 		}
-	}(i, max_workers)
+
+		// ketika topic closed → tutup jobs agar worker berhenti
+		close(jobs)
+
+	}()
 
 	return jobs
 }
 
-func worker(jobs <- chan func() error){ // receiver only notatiom. Only read from channel
-	for job := range jobs {
-		if err := job(); err != nil {
-			fmt.Printf("worker Dyn, error: %s", err)
+// worker with auto-shutdown after 30s idle
+func dynWorker(jobs <-chan event_bus.Event, db *sql.DB, job_store *generic.JobStore) {
+	idleTimer := time.NewTimer(30 * time.Second)
+
+	for {
+		select {
+		case event, ok := <-jobs:
+			if !ok {
+				// channel closed → worker mati
+				return
+			}
+			idleTimer.Reset(30 * time.Second)
+
+			effects, ok := event.Payload.([]generic.Effect)
+			if !ok {
+				job_store.Lock()
+				job_store.Data[event.WorkId] = generic.JobResult{
+					Status: "error",
+					Error:  "invalid effect payload",
+				}
+				job_store.Unlock()
+				continue
+			}
+
+			var finalResult any
+			var finalErr error
+
+			for _, ef := range effects {
+				result := handleEffect(ef, db)()
+				if result.Err != nil {
+					finalErr = result.Err
+					break
+				}
+				finalResult = result.Value
+			}
+
+			job_store.Lock()
+			if finalErr != nil {
+				job_store.Data[event.WorkId] = generic.JobResult{
+					Status: "error",
+					Error:  finalErr.Error(),
+				}
+			} else {
+				job_store.Data[event.WorkId] = generic.JobResult{
+					Status: "done",
+					Result: map[string]any{
+						"data": finalResult,
+					},
+				}
+			}
+			job_store.Unlock()
+
+		case <-idleTimer.C:
+			// auto shutdown
+			return
 		}
 	}
 }

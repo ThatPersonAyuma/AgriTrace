@@ -4,14 +4,9 @@ import (
 	"sync"
 )
 
-type UserLogin struct{
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-type Result[T any, return_effect any] struct{
+type Result[T any] struct{
 	Value T
-	Effect func() return_effect
+	Err error
 }
 
 type JobResult struct {
@@ -25,32 +20,21 @@ type JobStore struct {
 	Data map[string]JobResult
 }
 
-// Lazy memoizes result of f() and is safe for concurrent use.
-type Lazy[T any] struct {
-	once sync.Once
-	f    func() (T, error)
-	mu  sync.Mutex // protects v and err reads while f may still be running
-	v   T
-	err error
-	done bool
+type Effect struct {
+    Type  EffectType
+    ExecCommand string
+    Args  []any
+    Msg   string
+	Fn	  func() Result[any]
 }
 
-func NewLazy[T any](f func() (T, error)) Lazy[T] {
-	return Lazy[T]{f: f}
-}
+type EffectType int
 
-func (l *Lazy[T]) Get() (T, error) { // Impure
-	// Ensure f runs only once
-	l.once.Do(func() {
-		v, err := l.f()
-		l.mu.Lock()
-		l.v = v
-		l.err = err
-		l.done = true
-		l.mu.Unlock()
-	})
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.v, l.err
-}
-
+const (
+    EffectDB EffectType = iota
+	EffectDBQuery
+    EffectLog
+    EffectNotify
+    EffectEmail
+	EffectComplex
+)

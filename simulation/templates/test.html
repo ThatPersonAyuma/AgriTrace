@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Checkpoint Photo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+        .container {
+            max-width: 400px;
+            margin: auto;
+        }
+        input[type="number"], input[type="file"], button {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 8px;
+        }
+        #status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Upload Photo for Checkpoint</h2>
+        <label for="checkpointId">Checkpoint ID:</label>
+        <input type="number" id="checkpointId" placeholder="Enter checkpoint ID">
+
+        <label for="photo">Select Photo:</label>
+        <input type="file" id="photo" accept="image/*">
+
+        <button id="uploadBtn">Upload Photo</button>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+    async function uploadCheckpointPhotoMultipart(checkpointId, file) {
+        const formData = new FormData();
+        formData.append('checkpoint_id', checkpointId);
+        formData.append('photo', file);
+
+        const response = await fetch('http://localhost:8080/logistic/checkpoint/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const { job_id } = await response.json();
+
+        // Poll for result
+        return await pollJobStatus(job_id, 1000, 60, (progress) => {
+            document.getElementById('status').innerText = `Upload progress: ${progress}`;
+        });
+    }
+
+    async function pollJobStatus(jobId, intervalMs, maxTries, onProgress) {
+        for (let i = 0; i < maxTries; i++) {
+            const res = await fetch(`http://localhost:8080/work/check?id=${jobId}`);
+            const data = await res.json();
+
+            // Pastikan data.result ada
+            const result = data.result || {};
+            const status = result.status || 'processing';
+
+            onProgress(status);
+
+            if (status === 'done') {
+                // Return fileUrl jika ada
+                return result.fileUrl || null;
+            }
+            if (status === 'error') {
+                throw new Error(result.error || 'Unknown error');
+            }
+
+            // Tunggu interval
+            await new Promise(r => setTimeout(r, intervalMs));
+        }
+        throw new Error('Job polling timeout');
+    }
+
+    document.getElementById('uploadBtn').addEventListener('click', async () => {
+        const checkpointId = document.getElementById('checkpointId').value;
+        const fileInput = document.getElementById('photo');
+        if (!checkpointId || !fileInput.files.length) {
+            alert('Please provide checkpoint ID and select a photo.');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        try {
+            const fileUrl = await uploadCheckpointPhotoMultipart(checkpointId, file);
+            document.getElementById('status').innerText = `Upload completed! File URL: ${fileUrl || 'N/A'}`;
+        } catch (err) {
+            document.getElementById('status').innerText = `Upload failed: ${err.message}`;
+        }
+    });
+    </script>
+
+</body>
+</html>

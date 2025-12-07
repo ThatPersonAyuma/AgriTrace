@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Order Management</title>
+    <style>
+    body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background: #f7f7f7;
+    }
+
+    h1, h2 {
+        color: #333;
+    }
+
+    .order-form, .order-actions, .output {
+        background: #fff;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    label {
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    input[type="text"], input[type="number"] {
+        padding: 5px;
+        width: 200px;
+    }
+
+    button {
+        padding: 8px 12px;
+        margin-right: 5px;
+        margin-top: 5px;
+        cursor: pointer;
+        border: none;
+        background: #007BFF;
+        color: white;
+        border-radius: 4px;
+    }
+
+    button:hover {
+        background: #0056b3;
+    }
+
+    pre {
+        background: #eee;
+        padding: 10px;
+        border-radius: 4px;
+    }
+    </style>
+</head>
+<body>
+    <h1>Order Management</h1>
+
+    <div class="order-form">
+        <h2>Create Order</h2>
+        <label>Buyer ID: <input type="number" id="buyerID" /></label>
+        <label>Total Price: <input type="number" id="totalPrice" step="0.01"/></label>
+        <button onclick="createOrder()">Create Order</button>
+    </div>
+
+    <div class="order-actions">
+        <h2>Order Actions</h2>
+        <label>Order ID: <input type="text" id="orderID"/></label>
+        <button onclick="payOrder()">Pay</button>
+        <button onclick="cancelOrder()">Cancel</button>
+        <button onclick="confirmOrder()">Confirm by Farmer</button>
+        <button onclick="prepareOrder()">Prepare</button>
+        <button onclick="shipOrder()">Ship</button>
+        <button onclick="deliverOrder()">Deliver</button>
+        <button onclick="completeOrder()">Complete</button>
+    </div>
+
+    <div class="output">
+        <h2>Output</h2>
+        <pre id="output"></pre>
+    </div>
+
+    <script>
+        const apiBase = "http://localhost:8080/orders"; // sesuaikan endpoint server Go atau Python
+
+function showOutput(data) {
+    document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+}
+
+async function createOrder() {
+    const buyerID = document.getElementById("buyerID").value;
+    const totalPrice = parseFloat(document.getElementById("totalPrice").value);
+
+    const data = { buyerID, totalPrice };
+    try {
+        const res = await fetch(`${apiBase}/create`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        showOutput(json);
+    } catch (err) {
+        showOutput({ error: err.message });
+    }
+}
+
+async function payOrder() {
+    const orderID = document.getElementById("orderID").value;
+    await callOrderAction(orderID, "pay");
+}
+
+async function cancelOrder() {
+    const orderID = document.getElementById("orderID").value;
+    await callOrderAction(orderID, "cancel");
+}
+
+async function confirmOrder() {
+    const orderID = document.getElementById("orderID").value;
+    await callOrderAction(orderID, "confirm");
+}
+
+async function prepareOrder() {
+    const orderID = document.getElementById("orderID").value;
+    await callOrderAction(orderID, "prepare");
+}
+
+async function shipOrder() {
+    const orderID = document.getElementById("orderID").value;
+    const lat = 0.0, long = 0.0; // contoh lokasi
+    await callOrderAction(orderID, "ship", { lat, long });
+}
+
+async function deliverOrder() {
+    const orderID = document.getElementById("orderID").value;
+    const lat = 0.0, long = 0.0;
+    await callOrderAction(orderID, "deliver", { lat, long });
+}
+
+async function completeOrder() {
+    const orderID = document.getElementById("orderID").value;
+    await callOrderAction(orderID, "complete");
+}
+
+async function callOrderAction(orderID, action, extra = {}) {
+    const data = { orderID, ...extra };
+    try {
+        const res = await fetch(`${apiBase}/${action}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        showOutput(json);
+    } catch (err) {
+        showOutput({ error: err.message });
+    }
+}
+
+    </script>
+</body>
+</html>

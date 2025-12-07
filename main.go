@@ -1,52 +1,60 @@
 package main
 
 import (
+	"AgriTrace/Internal"
+	"AgriTrace/Internal/EventBus"
 	"context"
+	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
-	"AgriTrace/Internal/EventBus"
-	"AgriTrace/Internal"
 )
+func corsMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:8020") // frontend
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-// type user_order struct{
-// 	OrderId int `json:"OrderId"`
-// }
+        // Jika request method OPTIONS, cukup kembalikan status 200
+        if r.Method == http.MethodOptions {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
 
-// func createOrderHandler(b *event_bus.EventBus)func(http.ResponseWriter, *http.Request){
-// 	return func (w http.ResponseWriter, r *http.Request){
-// 		// Pastikan method POST
-// 		if r.Method != http.MethodPost {
-// 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-// 			return
-// 		}
-// 		// Decode JSON body
-// 		var userOrder user_order
-// 		err := json.NewDecoder(r.Body).Decode(&userOrder)
-// 		if err != nil {
-// 			http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
-// 			return
-// 		}
-// 		order.CreateOrder(b, userOrder.OrderId)
-// 	}
-// }
-
-
-
+        next.ServeHTTP(w, r)
+    })
+}
 func main() {
+	// eventBus := event_bus.NewEventBus(300,3,16)
 	eventBus := event_bus.NewEventBus()
 	mux := http.NewServeMux()
+	connStr := "user=postgres password=tIdakIngat dbname=AgriTrace sslmode=disable"
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer db.Close()
 
-	internal.Setup()(mux, eventBus)
+	db.SetMaxOpenConns(20)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(time.Hour)
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Error connecting to database: %v", err)
+	}
+	fmt.Println("Successfully connected to PostgreSQL!")
+	internal.Setup()(mux, eventBus, db)
 
 	server := &http.Server{
 		Addr:    ":8080",
-		Handler: mux,
+		Handler: corsMiddleware(mux),
 	}
 
-	// Jalankan server di goroutine agar tidak blocking
 	go func() {
 		fmt.Println("Server started at http://localhost:8080")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -54,17 +62,14 @@ func main() {
 		}
 	}()
 
-	// Tangkap sinyal interrupt (Ctrl+C) atau SIGTERM (docker, systemd, dsb)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit // blok sampai ada sinyal masuk
 	fmt.Println("\nShutting down gracefully...")
 
-	// Buat context dengan timeout (misal 5 detik)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Jalankan shutdown
 	if err := server.Shutdown(ctx); err != nil {
 		fmt.Printf("Server forced to shutdown: %v\n", err)
 	} else {

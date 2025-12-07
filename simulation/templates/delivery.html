@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shipment Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+    * { box-sizing: border-box; }
+    body { 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        margin: 0; 
+        padding: 20px; 
+        min-height: 100vh;
+    }
+    .container { 
+        max-width: 1400px; 
+        margin: auto; 
+        background: white; 
+        padding: 30px; 
+        border-radius: 12px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+    }
+    h1 { 
+        text-align: center; 
+        color: #333; 
+        margin-bottom: 10px;
+        font-size: 2em;
+    }
+    .subtitle {
+        text-align: center;
+        color: #666;
+        margin-bottom: 30px;
+        font-size: 0.95em;
+    }
+    .section { 
+        background: #f8f9fa; 
+        padding: 20px; 
+        border-radius: 8px; 
+        margin-bottom: 20px; 
+    }
+    .section h2 { 
+        margin-top: 0; 
+        color: #495057; 
+        font-size: 1.3em;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 10px;
+    }
+    .form-group { 
+        margin-bottom: 15px; 
+    }
+    label { 
+        display: block; 
+        margin-bottom: 5px; 
+        font-weight: 600; 
+        color: #495057;
+        font-size: 0.9em;
+    }
+    input, select, textarea { 
+        width: 100%; 
+        padding: 10px; 
+        border-radius: 6px; 
+        border: 2px solid #dee2e6; 
+        font-size: 14px;
+        transition: border-color 0.3s;
+    }
+    input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    .btn { 
+        padding: 10px 20px; 
+        border-radius: 6px; 
+        border: none; 
+        cursor: pointer; 
+        font-weight: 600;
+        font-size: 14px;
+        transition: all 0.3s;
+        margin-right: 10px;
+        margin-top: 5px;
+    }
+    .btn-primary { 
+        background: #667eea; 
+        color: white; 
+    }
+    .btn-primary:hover { 
+        background: #5568d3; 
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+    }
+    .btn-success { 
+        background: #28a745; 
+        color: white; 
+    }
+    .btn-success:hover { 
+        background: #218838; 
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+    }
+    .btn-danger { 
+        background: #dc3545; 
+        color: white; 
+    }
+    .btn-danger:hover { 
+        background: #c82333; 
+    }
+    .btn-location {
+        background: #17a2b8;
+        color: white;
+        width: 100%;
+        margin-top: 5px;
+    }
+    .btn-location:hover {
+        background: #138496;
+    }
+    .map-container { 
+        height: 450px; 
+        border-radius: 8px; 
+        border: 3px solid #dee2e6;
+        margin-bottom: 15px;
+        position: relative;
+    }
+    .map-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.85em;
+        z-index: 1000;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .map-badge.editable {
+        background: rgba(102, 126, 234, 0.95);
+        color: white;
+    }
+    .map-badge.readonly {
+        background: rgba(108, 117, 125, 0.95);
+        color: white;
+    }
+    .checkpoint-list { 
+        margin-top: 15px; 
+    }
+    .checkpoint-item { 
+        background: white; 
+        border: 2px solid #dee2e6; 
+        padding: 15px; 
+        margin-bottom: 10px; 
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.3s;
+    }
+    .checkpoint-item:hover {
+        border-color: #667eea;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    }
+    .checkpoint-info { 
+        flex: 1; 
+    }
+    .checkpoint-type { 
+        display: inline-block;
+        padding: 4px 12px; 
+        border-radius: 20px; 
+        font-size: 0.8em; 
+        font-weight: 600;
+        margin-right: 10px;
+        text-transform: uppercase;
+    }
+    .type-start { 
+        background: #d4edda; 
+        color: #155724; 
+    }
+    .type-onroad { 
+        background: #fff3cd; 
+        color: #856404; 
+    }
+    .type-end { 
+        background: #f8d7da; 
+        color: #721c24; 
+    }
+    .location-text { 
+        color: #6c757d; 
+        font-size: 0.85em; 
+        margin-top: 5px;
+    }
+    .alert { 
+        padding: 12px 20px; 
+        border-radius: 6px; 
+        margin-bottom: 15px;
+        font-weight: 500;
+    }
+    .alert-warning { 
+        background: #fff3cd; 
+        color: #856404; 
+        border-left: 4px solid #ffc107;
+    }
+    .alert-info { 
+        background: #d1ecf1; 
+        color: #0c5460; 
+        border-left: 4px solid #17a2b8;
+    }
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border-left: 4px solid #28a745;
+    }
+    .shipment-info {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        border: 2px solid #667eea;
+    }
+    .shipment-info p {
+        margin: 8px 0;
+    }
+    .checkpoint-actions {
+        display: flex;
+        gap: 10px;
+    }
+    .two-column {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    .legend {
+        margin-top: 15px; 
+        padding: 15px; 
+        background: white; 
+        border-radius: 8px;
+        border: 2px solid #dee2e6;
+    }
+    .legend-items {
+        display: flex; 
+        gap: 20px; 
+        margin-top: 10px; 
+        flex-wrap: wrap;
+    }
+    .legend-item {
+        display: flex; 
+        align-items: center; 
+        gap: 8px;
+    }
+    .legend-circle {
+        width: 20px; 
+        height: 20px; 
+        border-radius: 50%;
+    }
+    @media (max-width: 768px) {
+        .two-column {
+            grid-template-columns: 1fr;
+        }
+        .container {
+            padding: 15px;
+        }
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📦 Shipment Dashboard</h1>
+    <p class="subtitle">Kelola pengiriman dengan checkpoint lokasi yang fleksibel</p>
+
+    <div class="two-column">
+        <!-- Left Column: Interactive Map & Form -->
+        <div>
+            <!-- Map Section -->
+            <div class="section">
+                <h2>🗺️ Pilih Lokasi Checkpoint</h2>
+                <div class="map-container">
+                    <div class="map-badge editable">✏️ EDITABLE</div>
+                    <div id="map" style="height: 100%; width: 100%; border-radius: 8px;"></div>
+                </div>
+                <button class="btn btn-location" onclick="useCurrentLocation()">📍 Gunakan Lokasi Saya</button>
+            </div>
+
+            <!-- Add Checkpoint Section -->
+            <div class="section">
+                <h2>➕ Tambah Checkpoint</h2>
+                
+                <div class="form-group">
+                    <label>Tipe Checkpoint *</label>
+                    <select id="checkpointType">
+                        <option value="">-- Pilih Tipe --</option>
+                        <option value="start">START - Titik Penjemputan</option>
+                        <option value="onroad">ONROAD - Titik Perjalanan</option>
+                        <option value="end">END - Tujuan Akhir</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Lokasi (Latitude, Longitude) *</label>
+                    <input type="text" id="checkpointLocation" placeholder="Klik peta atau gunakan lokasi saat ini" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>Catatan</label>
+                    <textarea id="checkpointNotes" rows="2" placeholder="Contoh: Depan gedung A, samping minimarket"></textarea>
+                </div>
+                
+                <button class="btn btn-success" onclick="addCheckpoint()">✓ Tambah Checkpoint</button>
+            </div>
+
+            <!-- Create Shipment Section -->
+            <div class="section">
+                <h2>🚚 Buat Shipment</h2>
+                
+                <div id="shipmentValidation"></div>
+                
+                <div class="form-group">
+                    <label>Order ID *</label>
+                    <input type="number" id="orderID" placeholder="Contoh: 12345">
+                </div>
+                
+                <div class="form-group">
+                    <label>Delivery Staff ID *</label>
+                    <input type="number" id="staffID" placeholder="Contoh: 101">
+                </div>
+
+                <div class="form-group">
+                    <label>Estimasi Waktu</label>
+                    <input type="datetime-local" id="extimation" placeholder="Contoh: 101">
+                </div>
+                
+                <button class="btn btn-primary" onclick="createShipment()">🚀 Buat Shipment</button>
+            </div>
+        </div>
+
+        <!-- Right Column: Preview Map & Checkpoint List -->
+        <div>
+            <!-- Preview Map Section -->
+            <div class="section">
+                <h2>👁️ Preview Checkpoint</h2>
+                <div class="alert alert-info">
+                    Peta ini menampilkan semua checkpoint yang telah ditambahkan (read-only).
+                </div>
+                <div class="map-container">
+                    <div class="map-badge readonly">🔒 READ-ONLY</div>
+                    <div id="previewMap" style="height: 100%; width: 100%; border-radius: 8px;"></div>
+                </div>
+                
+                <div class="legend">
+                    <strong>Legenda:</strong>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <div class="legend-circle" style="background: #28a745;"></div>
+                            <span>START</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-circle" style="background: #fd7e14;"></div>
+                            <span>ONROAD</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-circle" style="background: #dc3545;"></div>
+                            <span>END</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Checkpoint List -->
+            <div class="section">
+                <h2>📍 Daftar Checkpoint</h2>
+                <div id="checkpointsList" class="checkpoint-list">
+                    <div class="alert alert-info">
+                        Belum ada checkpoint. Tambahkan minimal START dan END checkpoint untuk membuat shipment.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shipment Status -->
+    <div class="section" id="shipmentStatusSection" style="display: none;">
+        <h2>📊 Status Shipment</h2>
+        <div id="shipmentStatus" class="shipment-info"></div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+let map, previewMap, currentMarker;
+let checkpoints = [];
+let shipment = null;
+let selectedLocation = null;
+
+// Initialize Interactive Map (Left - Editable)
+function initMap() {
+    map = L.map('map').setView([-6.2088, 106.8456], 12);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+
+    map.on('click', function(e) {
+        const lat = e.latlng.lat.toFixed(6);
+        const lng = e.latlng.lng.toFixed(6);
+        
+        selectedLocation = { lat: parseFloat(lat), lng: parseFloat(lng) };
+        document.getElementById('checkpointLocation').value = `${lat}, ${lng}`;
+        
+        if (currentMarker) {
+            map.removeLayer(currentMarker);
+        }
+        
+        currentMarker = L.marker([lat, lng], {
+            icon: L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            })
+        }).addTo(map);
+    });
+}
+
+// Initialize Preview Map (Right - Read-only)
+function initPreviewMap() {
+    previewMap = L.map('previewMap', {
+        dragging: true,
+        touchZoom: true,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        boxZoom: true,
+        keyboard: true,
+        zoomControl: true
+    }).setView([-6.2088, 106.8456], 12);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(previewMap);
+}
+
+function useCurrentLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                const lat = position.coords.latitude.toFixed(6);
+                const lng = position.coords.longitude.toFixed(6);
+                
+                selectedLocation = { lat: parseFloat(lat), lng: parseFloat(lng) };
+                document.getElementById('checkpointLocation').value = `${lat}, ${lng}`;
+                
+                if (currentMarker) {
+                    map.removeLayer(currentMarker);
+                }
+                
+                currentMarker = L.marker([lat, lng], {
+                    icon: L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    })
+                }).addTo(map);
+                
+                map.setView([lat, lng], 15);
+            },
+            error => {
+                alert('Gagal mendapatkan lokasi: ' + error.message);
+            }
+        );
+    } else {
+        alert('Geolocation tidak didukung oleh browser Anda.');
+    }
+}
+
+function addCheckpoint() {
+    const type = document.getElementById('checkpointType').value;
+    const location = document.getElementById('checkpointLocation').value;
+    const notes = document.getElementById('checkpointNotes').value;
+    
+    if (!type) {
+        alert('Pilih tipe checkpoint terlebih dahulu!');
+        return;
+    }
+    
+    if (!location || !selectedLocation) {
+        alert('Pilih lokasi pada peta atau gunakan lokasi saat ini!');
+        return;
+    }
+    
+    // Check if START or END already exists
+    if (type === 'start' && checkpoints.some(cp => cp.type === 'start')) {
+        alert('Checkpoint START sudah ada! Hapus yang lama jika ingin menggantinya.');
+        return;
+    }
+    
+    if (type === 'end' && checkpoints.some(cp => cp.type === 'end')) {
+        alert('Checkpoint END sudah ada! Hapus yang lama jika ingin menggantinya.');
+        return;
+    }
+    
+    const checkpoint = {
+        id: Date.now(),
+        type: type,
+        lat: selectedLocation.lat,
+        lng: selectedLocation.lng,
+        notes: notes || '-',
+        timestamp: new Date().toLocaleString('id-ID')
+    };
+    
+    checkpoints.push(checkpoint);
+    
+    // Reset form
+    document.getElementById('checkpointType').value = '';
+    document.getElementById('checkpointLocation').value = '';
+    document.getElementById('checkpointNotes').value = '';
+    selectedLocation = null;
+    
+    if (currentMarker) {
+        map.removeLayer(currentMarker);
+        currentMarker = null;
+    }
+    
+    updateCheckpointsList();
+    updatePreviewMap();
+    updateShipmentValidation();
+}
+
+function removeCheckpoint(id) {
+    if (confirm('Hapus checkpoint ini?')) {
+        checkpoints = checkpoints.filter(cp => cp.id !== id);
+        updateCheckpointsList();
+        updatePreviewMap();
+        updateShipmentValidation();
+    }
+}
+
+function updateCheckpointsList() {
+    const container = document.getElementById('checkpointsList');
+    
+    if (checkpoints.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                Belum ada checkpoint. Tambahkan minimal START dan END checkpoint untuk membuat shipment.
+            </div>
+        `;
+        return;
+    }
+    
+    // Sort: START first, then ONROAD, then END
+    const sorted = [...checkpoints].sort((a, b) => {
+        const order = { start: 0, onroad: 1, end: 2 };
+        return order[a.type] - order[b.type];
+    });
+    
+    container.innerHTML = sorted.map(cp => `
+        <div class="checkpoint-item">
+            <div class="checkpoint-info">
+                <div>
+                    <span class="checkpoint-type type-${cp.type}">${cp.type}</span>
+                    <strong>${cp.notes}</strong>
+                </div>
+                <div class="location-text">📍 ${cp.lat}, ${cp.lng}</div>
+                <div class="location-text">🕐 ${cp.timestamp}</div>
+            </div>
+            <div class="checkpoint-actions">
+                <button class="btn btn-danger" onclick="removeCheckpoint(${cp.id})">🗑️ Hapus</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updatePreviewMap() {
+    // Clear all markers and layers from preview map
+    previewMap.eachLayer(layer => {
+        if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+            previewMap.removeLayer(layer);
+        }
+    });
+    
+    if (checkpoints.length === 0) {
+        previewMap.setView([-6.2088, 106.8456], 12);
+        return;
+    }
+    
+    // Sort checkpoints
+    const sorted = [...checkpoints].sort((a, b) => {
+        const order = { start: 0, onroad: 1, end: 2 };
+        return order[a.type] - order[b.type];
+    });
+    
+    const markerColors = {
+        start: 'green',
+        onroad: 'orange',
+        end: 'red'
+    };
+    
+    const markerLabels = {
+        start: '🟢 START',
+        onroad: '🟠 ONROAD',
+        end: '🔴 END'
+    };
+    
+    // Add numbered markers for onroad checkpoints
+    let onroadCounter = 1;
+    
+    sorted.forEach(cp => {
+        let popupLabel = markerLabels[cp.type];
+        if (cp.type === 'onroad') {
+            popupLabel = `🟠 ONROAD #${onroadCounter}`;
+            onroadCounter++;
+        }
+        
+        L.marker([cp.lat, cp.lng], {
+            icon: L.icon({
+                iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColors[cp.type]}.png`,
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            })
+        })
+        .bindPopup(`
+            <strong>${popupLabel}</strong><br>
+            <strong>Catatan:</strong> ${cp.notes}<br>
+            <strong>Koordinat:</strong> ${cp.lat}, ${cp.lng}<br>
+            <strong>Waktu:</strong> ${cp.timestamp}
+        `)
+        .addTo(previewMap);
+    });
+    
+    // Draw route line if more than 1 checkpoint
+    if (sorted.length > 1) {
+        const latlngs = sorted.map(cp => [cp.lat, cp.lng]);
+        L.polyline(latlngs, { 
+            color: '#667eea', 
+            weight: 4, 
+            opacity: 0.7,
+            dashArray: '10, 5'
+        }).addTo(previewMap);
+        
+        // Fit bounds to show all markers
+        const bounds = L.latLngBounds(latlngs);
+        previewMap.fitBounds(bounds, { padding: [50, 50] });
+    } else {
+        // Center on single checkpoint
+        previewMap.setView([sorted[0].lat, sorted[0].lng], 14);
+    }
+}
+
+function updateShipmentValidation() {
+    const validationDiv = document.getElementById('shipmentValidation');
+    const hasStart = checkpoints.some(cp => cp.type === 'start');
+    const hasEnd = checkpoints.some(cp => cp.type === 'end');
+    
+    if (!hasStart || !hasEnd) {
+        validationDiv.innerHTML = `
+            <div class="alert alert-warning">
+                ⚠️ Untuk membuat shipment, Anda harus menambahkan:
+                ${!hasStart ? '<br>• Checkpoint <strong>START</strong>' : ''}
+                ${!hasEnd ? '<br>• Checkpoint <strong>END</strong>' : ''}
+            </div>
+        `;
+    } else {
+        validationDiv.innerHTML = `
+            <div class="alert alert-success">
+                ✓ Semua checkpoint wajib sudah ditambahkan. Anda dapat membuat shipment sekarang!
+            </div>
+        `;
+    }
+}
+
+async function createShipment() {
+    const orderID = document.getElementById('orderID').value;
+    const staffID = document.getElementById('staffID').value;
+    const time = document.getElementById('extimation').value;
+    
+    const date = new Date(time);
+    const extimation = date.toISOString();
+
+
+    if (!orderID || !staffID) {
+        alert('Order ID dan Delivery Staff ID harus diisi!');
+        return;
+    }
+    
+    const hasStart = checkpoints.some(cp => cp.type === 'start');
+    const hasEnd = checkpoints.some(cp => cp.type === 'end');
+    
+    if (!hasStart || !hasEnd) {
+        alert('Anda harus menambahkan minimal checkpoint START dan END!');
+        return;
+    }
+    
+    // Map checkpoint types to match backend format
+    const checkpointTypeMap = {
+        'start': 'START',
+        'onroad': 'ONROAD',
+        'end': 'END'
+    };
+    
+    // Sort checkpoints: START -> ONROAD -> END
+    const sortedCheckpoints = [...checkpoints].sort((a, b) => {
+        const order = { start: 0, onroad: 1, end: 2 };
+        return order[a.type] - order[b.type];
+    });
+    
+    // Prepare payload
+    const payload = {
+        order_id: parseInt(orderID),
+        delivery_staff_id: parseInt(staffID),
+        estimated_time: extimation, // 1 hour from now
+        checkpoints: sortedCheckpoints.map(cp => ({
+            type: checkpointTypeMap[cp.type],
+            lat: cp.lat,
+            long: cp.lng,
+            notes: cp.notes || ''
+
+        }))
+    };
+    
+    try {
+        // Show loading state
+        const createBtn = event.target;
+        const originalText = createBtn.textContent;
+        createBtn.disabled = true;
+        createBtn.textContent = '⏳ Membuat shipment...';
+        
+        // Send POST request to backend
+        const response = await fetch('http://localhost:8080/logistic/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log(result)
+        // Store shipment data locally
+        const startCP = checkpoints.find(cp => cp.type === 'start');
+        const endCP = checkpoints.find(cp => cp.type === 'end');
+        
+        shipment = {
+            id: result.id || result.ID || Date.now(),
+            orderID: parseInt(orderID),
+            deliveryStaffID: parseInt(staffID),
+            status: result.status || 'CREATED',
+            createdAt: result.createdAt || new Date().toLocaleString('id-ID'),
+            startLocation: { lat: startCP.lat, lng: startCP.lng },
+            endLocation: { lat: endCP.lat, lng: endCP.lng },
+            checkpoints: [...checkpoints]
+        };
+        
+        displayShipmentStatus();
+        
+        alert('✓ Shipment berhasil dibuat!');
+        
+        // Reset button
+        createBtn.disabled = false;
+        createBtn.textContent = originalText;
+        
+    } catch (error) {
+        console.error('Error creating shipment:', error);
+        alert('❌ Gagal membuat shipment: ' + error.message);
+        
+        // Reset button
+        const createBtn = document.querySelector('#createShipmentBtn');
+        if (createBtn) {
+            createBtn.disabled = false;
+            createBtn.textContent = '🚀 Buat Shipment';
+        }
+    }
+}
+
+function displayShipmentStatus() {
+    const section = document.getElementById('shipmentStatusSection');
+    const statusDiv = document.getElementById('shipmentStatus');
+    
+    section.style.display = 'block';
+    
+    const onroadCount = shipment.checkpoints.filter(cp => cp.type === 'onroad').length;
+    
+    statusDiv.innerHTML = `
+        <p><strong>Shipment ID:</strong> #${shipment.id}</p>
+        <p><strong>Order ID:</strong> ${shipment.orderID}</p>
+        <p><strong>Delivery Staff ID:</strong> ${shipment.deliveryStaffID}</p>
+        <p><strong>Status:</strong> <span style="color: #28a745; font-weight: 600;">${shipment.status}</span></p>
+        <p><strong>Dibuat:</strong> ${shipment.createdAt}</p>
+        <p><strong>Total Checkpoint:</strong> ${shipment.checkpoints.length} (1 START + ${onroadCount} ONROAD + 1 END)</p>
+    `;
+    
+    section.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Initialize both maps on load
+initMap();
+initPreviewMap();
+updateShipmentValidation();
+</script>
+
+</body>
+</html>
