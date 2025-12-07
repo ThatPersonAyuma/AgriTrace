@@ -11,7 +11,18 @@ jobs = {}
 @app.route('/')
 def index():
     return render_template('delivery.html')  # folder templates/delivery.html
-
+@app.route('/check')
+def check():
+    return render_template('delivery_check.html')
+@app.route('/test')
+def test():
+    return render_template('test.html')
+@app.route('/order')
+def order():
+    return render_template('order.html')
+@app.route('/product')
+def product():
+    return render_template('product.html')
 # API endpoint untuk create shipment
 # @app.route('/logistic/create', methods=['POST'])
 # def create_shipment():

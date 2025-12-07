@@ -37,15 +37,19 @@ func Setup() func(*http.ServeMux, *event_bus.EventBus, *sql.DB){
 		mux.HandleFunc("/product/listed", http_adapters.CreateFuncHandler[core.Nothing](eventBus, &job_store, http.MethodGet, fmt.Sprintf("Product.%s", core.ProductListed)))
 		mux.HandleFunc("/product/unlisted", http_adapters.CreateFuncHandler[core.Nothing](eventBus, &job_store, http.MethodGet, fmt.Sprintf("Product.%s", core.ProductUnlisted)))
 		mux.HandleFunc("/product/search", http_adapters.CreateFuncHandler[core.SerachKeyword](eventBus, &job_store, http.MethodGet, fmt.Sprintf("Product.%s", core.SerachProduct)))
-		
+		mux.HandleFunc("/product/create", http_adapters.CreateFuncHandler[core.SerachKeyword](eventBus, &job_store, http.MethodGet, fmt.Sprintf("Product.%s", core.CreateProduct)))
+
 		// Accounts
 		mux.HandleFunc("/account/create", http_adapters.CreateFuncHandler[core.AccountCreatedReq](eventBus, &job_store, http.MethodPost, fmt.Sprintf("Account.%s", core.AccountCreated)))
 		mux.HandleFunc("/account/update", http_adapters.CreateFuncHandler[core.AccountUpdatedReq](eventBus, &job_store, http.MethodPost, fmt.Sprintf("Account.%s", core.AccountUpdated)))
 
 		// Logistic
+		mux.HandleFunc("/logistic/checkpoint/upload", http_adapters.HandleCheckpointPhotoUploadMultipart(eventBus, &job_store, fmt.Sprintf("Logistic.%s", core.CheckpointPhotoUploaded)))
+		mux.HandleFunc("/uploads/", http_adapters.HandleServeUploadedFile())
 		mux.HandleFunc("/logistic/create", http_adapters.CreateFuncHandler[core.ShipmentCreatedReq](eventBus, &job_store, http.MethodPost, fmt.Sprintf("Logistic.%s", core.ShipmentCreated)))
+		mux.HandleFunc("/logistic/get", http_adapters.CreateFuncHandler[core.GetOrderCheckpointsReq](eventBus, &job_store, http.MethodPost, fmt.Sprintf("Logistic.%s", core.GetShipment)))
 		mux.HandleFunc("/logistic/checkpoint/added", http_adapters.CreateFuncHandler[core.CheckpointAddedReq](eventBus, &job_store, http.MethodPost, fmt.Sprintf("Logistic.%s", core.CheckpointAdded)))
-		mux.HandleFunc("/logistic/checkpoint/photo", http_adapters.CreateFuncHandler[core.CheckpointPhotoReq](eventBus, &job_store,  http.MethodPost, fmt.Sprintf("Logistic.%s", core.CheckpointPhotoUploaded)))
+		// mux.HandleFunc("/logistic/checkpoint/photo", http_adapters.CreateFuncHandler[core.CheckpointPhotoReq](eventBus, &job_store,  http.MethodPost, fmt.Sprintf("Logistic.%s", core.CheckpointPhotoUploaded)))
 		mux.HandleFunc("/logistic/checkpoint/verify", http_adapters.CreateFuncHandler[core.CheckpointVerifyReq](eventBus, &job_store,  http.MethodPost, fmt.Sprintf("Logistic.%s", core.CheckpointVerified)))
 		mux.HandleFunc("/logistic/completed", http_adapters.CreateFuncHandler[core.ShipmentCompletedReq](eventBus, &job_store,  http.MethodPost, fmt.Sprintf("Logistic.%s", core.ShipmentCompleted)))
 		mux.HandleFunc("/logistic/delayed", http_adapters.CreateFuncHandler[core.ShipmentDelayedReq](eventBus, &job_store,  http.MethodPost, fmt.Sprintf("Logistic.%s", core.ShipmentDelayed)))

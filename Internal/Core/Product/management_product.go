@@ -55,6 +55,24 @@ func SearchPerformed(keywords string) []generic.Effect {
 		},
 	}
 }
+func CreateProduct(farmerID int, name, description string, price float64, stock int) generic.Effect {
+	return generic.Effect{
+		Type: generic.EffectDBQuery,
+		ExecCommand: `
+			INSERT INTO products (farmer_id, name, description, price, stock)
+			VALUES ($1, $2, $3, $4, $5)
+			RETURNING id
+		`,
+		Args: []any{
+			farmerID,
+			name,
+			description,
+			price,
+			stock,
+		},
+	}
+}
+
 func ListenProduct(b *event_bus.EventBus, topic, worker_topic string, job_store *generic.JobStore) {
 	sub := b.Subscribe(topic)
 

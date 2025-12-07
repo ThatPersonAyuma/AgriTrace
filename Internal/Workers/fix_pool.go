@@ -125,7 +125,7 @@ func ListenFixWorks(
                         finalErr = result.Err
                         break
                     }
-                    finalValue = result.Value
+                    if result.Value!=nil {finalValue = result.Value}
                 }
 
                 // Save final result ONCE

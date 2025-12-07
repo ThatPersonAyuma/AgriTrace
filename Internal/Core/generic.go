@@ -23,6 +23,7 @@ const (
 	SerachProduct   = "Search"
 
 	ShipmentCreated         = "ShipmentCreated"
+	GetShipment             = "GetShipment"
 	CheckpointAdded         = "CheckpointAdded"
 	CheckpointPhotoUploaded = "CheckpointPhotoUploaded"
 	CheckpointVerified      = "CheckpointVerified"
@@ -61,11 +62,6 @@ type CheckpointAddedReq struct {
 	Long    float64 `json:"long"`
 	Status  string  `json:"status"`
 	Notes   string  `json:"notes"`
-}
-
-type CheckpointPhotoReq struct {
-	CheckpointID int    `json:"checkpoint_id"`
-	PhotoURL     string `json:"photo_url"`
 }
 
 type CheckpointVerifyReq struct {
@@ -141,3 +137,11 @@ func (ct CheckpointType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(string(ct))
 }
 
+type GetOrderCheckpointsReq struct {
+	OrderID int `json:"order_id"`
+}
+type CheckpointPhotoUploadReq struct {
+	CheckpointID int    `json:"checkpoint_id"`
+	Filename     string `json:"filename"`
+	FileData     []byte `json:"file_data"` // Base64 encoded file data
+}

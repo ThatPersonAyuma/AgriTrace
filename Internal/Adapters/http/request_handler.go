@@ -1,15 +1,20 @@
 package http_adapters
 
 import (
+	core "AgriTrace/Internal/Core"
 	"AgriTrace/Internal/EventBus"
 	"AgriTrace/Internal/Generic"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"path/filepath"
+	"strconv"
 	"strings"
-	"github.com/gorilla/schema"
+
 	"github.com/google/uuid"
+	"github.com/gorilla/schema"
 )
 
 func CreateGetStatusHandler(job_store *generic.JobStore) http.HandlerFunc{
@@ -143,5 +148,92 @@ func CreateFuncHandler[T any](b *event_bus.EventBus, jobStore *generic.JobStore,
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
+	}
+}
+func HandleCheckpointPhotoUploadMultipart(b *event_bus.EventBus, jobStore *generic.JobStore, topic string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse multipart form (max 10MB)
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10MB max
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			http.Error(w, "Failed to parse form", http.StatusBadRequest)
+			return
+		}
+		// if err := r.ParseMultipartForm(10 << 20); err != nil {
+		// 	http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		// 	return
+		// }
+
+		// Get checkpoint_id from form
+		checkpointIDStr := r.FormValue("checkpoint_id")
+		checkpointID, err := strconv.Atoi(checkpointIDStr)
+		if err != nil {
+			http.Error(w, "Invalid checkpoint_id", http.StatusBadRequest)
+			return
+		}
+
+		// Get file from form
+		file, header, err := r.FormFile("photo")
+		if err != nil {
+			http.Error(w, "Failed to get file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// Read file data
+		fileData, err := io.ReadAll(file)
+		if err != nil {
+			http.Error(w, "Failed to read file", http.StatusInternalServerError)
+			return
+		}
+
+		// Create request
+		req := core.CheckpointPhotoUploadReq{
+			CheckpointID: checkpointID,
+			Filename:     header.Filename,
+			FileData:     fileData,
+		}
+
+		// Generate job ID
+		jobID := uuid.New().String()
+
+		// Store initial job status
+		jobStore.Lock()
+		jobStore.Data[jobID] = generic.JobResult{
+			Status: "Processing",
+		}
+		jobStore.Unlock()
+
+		// Publish to event bus
+		b.Publish(topic, event_bus.Event{
+			WorkId:  jobID,
+			Payload: req,
+		})
+
+		// Return job ID
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"job_id": jobID,
+			"status": "submitted",
+		})
+	}
+}
+func HandleServeUploadedFile() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get filename from URL path
+		filename := strings.TrimPrefix(r.URL.Path, "/uploads/")
+		if filename == "" {
+			http.Error(w, "File not found", http.StatusNotFound)
+			return
+		}
+
+		// Prevent directory traversal
+		filename = filepath.Clean(filename)
+		if strings.Contains(filename, "..") {
+			http.Error(w, "Invalid file path", http.StatusBadRequest)
+			return
+		}
+
+		filePath := filepath.Join("./uploads", filename)
+		http.ServeFile(w, r, filePath)
 	}
 }

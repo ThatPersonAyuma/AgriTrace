@@ -1,12 +1,13 @@
 package logistic
 
-import ( 
-    core "AgriTrace/Internal/Core"
-    event_bus "AgriTrace/Internal/EventBus"
-    generic "AgriTrace/Internal/Generic"
-    "fmt"
-    "time"
-
+import (
+	core "AgriTrace/Internal/Core"
+	event_bus "AgriTrace/Internal/EventBus"
+	generic "AgriTrace/Internal/Generic"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 )
 
 // If the order table has this column
@@ -37,48 +38,75 @@ import (
 
 // }
 
+// func GetShipmentCreatedEffect( // Fungsi untuk membuat data yang dibutuhkan effect atau work
+//     orderID int,
+//     startLat float64,
+//     startLong float64,
+//     endLat float64,
+//     endLong float64,
+//     now time.Time,
+// ) []generic.Effect {
+//     return []generic.Effect{
+//         {
+// 			Type: generic.EffectDB,
+//             ExecCommand: `
+//                 INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, notes)
+//                 VALUES ($1, $2, $3, $4, $5, $6)
+//             `,
+//             Args: []any{orderID, "START_CREATED", now, startLat, startLong, "Initial start checkpoint"},
+//         },
+//         {
+//             Type: generic.EffectDB,
+//             ExecCommand: `
+//                 INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, notes)
+//                 VALUES ($1, $2, $3, $4, $5, $6)
+//             `,
+//             Args: []any{orderID, "END_CREATED", now, endLat, endLong, "Initial end checkpoint"},
+//         },
+//         {
+//             Type: generic.EffectDB,
+//             ExecCommand: `
+//                 UPDATE "order"
+//                 SET status=$1, start_delivery=$2, updated_at=$3
+//                 WHERE id=$4
+//             `,
+//             Args: []any{"CREATED", now, now, orderID},
+//         },
+//         {
+//             Type: generic.EffectLog,
+//             Msg:  fmt.Sprintf("Shipment %d created at %v", orderID, now),
+//         },
+//     }
+// }
 
-func GetShipmentCreatedEffect( // Fungsi untuk membuat data yang dibutuhkan effect atau work
-    orderID int,
-    startLat float64,
-    startLong float64,
-    endLat float64,
-    endLong float64,
-    now time.Time,
-) []generic.Effect {
-    return []generic.Effect{
-        {
-			Type: generic.EffectDB,
-            ExecCommand: `
-                INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, notes)
-                VALUES ($1, $2, $3, $4, $5, $6)
-            `,
-            Args: []any{orderID, "START_CREATED", now, startLat, startLong, "Initial start checkpoint"},
-        },
-        {
-            Type: generic.EffectDB,
-            ExecCommand: `
-                INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, notes)
-                VALUES ($1, $2, $3, $4, $5, $6)
-            `,
-            Args: []any{orderID, "END_CREATED", now, endLat, endLong, "Initial end checkpoint"},
-        },
-        {
-            Type: generic.EffectDB,
-            ExecCommand: `
-                UPDATE "order"
-                SET status=$1, start_delivery=$2, updated_at=$3
-                WHERE id=$4
-            `,
-            Args: []any{"CREATED", now, now, orderID},
-        },
-        {
-            Type: generic.EffectLog,
-            Msg:  fmt.Sprintf("Shipment %d created at %v", orderID, now),
-        },
-    }
+func GetOrderCheckpointsSimple(req core.GetOrderCheckpointsReq) []generic.Effect {
+	return []generic.Effect{
+		{
+			Type: generic.EffectDBQuery,
+			ExecCommand: `
+				SELECT 
+					c.id, 
+					c.order_id, 
+					c.status, 
+					c.timestamp, 
+					c.location_lat, 
+					c.location_long, 
+					c.type, 
+					COALESCE(c.notes, '') as notes
+				FROM checkpoints c
+				INNER JOIN orders o ON o.id = c.order_id
+				WHERE c.order_id = $1 
+				  AND o.status = 'SHIPMENT_CREATED'
+				ORDER BY c.timestamp ASC, c.id ASC
+			`,
+			Args: []any{req.OrderID},
+		},
+		{
+			Type: generic.EffectLog,
+			Msg:  fmt.Sprintf("Retrieved checkpoints for order %d", req.OrderID),
+		},
+	}
 }
-
 func ShipmentCreated(
 	orderID int,
 	deliveryStaffID int,
@@ -161,28 +189,70 @@ func CheckpointAdded(
 		},
 	}
 }
+func Validate(req core.CheckpointPhotoUploadReq) error {
+	if req.CheckpointID <= 0 {
+		return fmt.Errorf("invalid checkpoint_id")
+	}
+	if req.Filename == "" {
+		return fmt.Errorf("filename is required")
+	}
+	if len(req.FileData) == 0 {
+		return fmt.Errorf("file_data is required")
+	}
+	return nil
+}
+func CheckpointPhotoUploaded(req core.CheckpointPhotoUploadReq, now time.Time) generic.Result[[]generic.Effect] {
+	if err := Validate(req); err != nil {
+		return generic.Result[[]generic.Effect]{nil, err}
+	}
 
-func CheckpointPhotoUploaded(
-	checkpointID int,
-	photoURL string,
-	now time.Time,
-) []generic.Effect {
-	return []generic.Effect{
+	return generic.Result[[]generic.Effect]{Value:[]generic.Effect{
+		{
+			Type: generic.EffectComplex,
+			Fn: func() generic.Result[any] {
+				// Create uploads directory if not exists
+				uploadDir := "./uploads"
+				if err := os.MkdirAll(uploadDir, 0755); err != nil {
+					return generic.Result[any]{Err: fmt.Errorf("failed to create upload directory: %w", err)}
+				}
+
+				// Generate unique filename
+				ext := filepath.Ext(req.Filename)
+				uniqueFilename := fmt.Sprintf("%d_%d%s", req.CheckpointID, time.Now().Unix(), ext)
+				filePath := filepath.Join(uploadDir, uniqueFilename)
+
+				// Save file
+				if err := os.WriteFile(filePath, req.FileData, 0644); err != nil {
+					return generic.Result[any]{Err: fmt.Errorf("failed to save file: %w", err)}
+				}
+
+				// Return file path for database update
+				return generic.Result[any]{Value: filePath}
+			},
+		},
 		{
 			Type: generic.EffectDB,
 			ExecCommand: `
-				UPDATE checkpoint
-				SET photo_url = $1,
-					updated_at = $2
-				WHERE id = $3
+				UPDATE checkpoints
+				SET timestamp = $1,
+					status = $3
+				WHERE id = $2
 			`,
-			Args: []any{photoURL, now, checkpointID},
+			Args: []any{now, req.CheckpointID, "PASSED"},
+		},
+		{
+			Type: generic.EffectDB,
+			ExecCommand: `
+				INSERT INTO checkpoint_photos (checkpoint_id, photo_url, uploaded_at)
+				VALUES ($1, $2, $3)
+			`,
+			Args: []any{req.CheckpointID, fmt.Sprintf("/uploads/%d_%s", req.CheckpointID, req.Filename), now},
 		},
 		{
 			Type: generic.EffectLog,
-			Msg:  fmt.Sprintf("Photo uploaded for checkpoint %d: %s", checkpointID, photoURL),
+			Msg:  fmt.Sprintf("Photo uploaded for checkpoints %d", req.CheckpointID),
 		},
-	}
+	}, Err: nil}
 }
 
 func CheckpointVerified(
@@ -310,18 +380,7 @@ func validateCheckpoints(checkpoints []core.Checkpoint) error {
 	return nil
 }
 // Validate validates the shipment creation request
-func Validate(req core.ShipmentCreatedReq) error {
-	if req.OrderID <= 0 {
-		return fmt.Errorf("invalid order_id")
-	}
-	if req.DeliveryStaffID <= 0 {
-		return fmt.Errorf("invalid delivery_staff_id")
-	}
-	if req.EstimatedTime.IsZero() {
-		return fmt.Errorf("estimated_time is required")
-	}
-	return validateCheckpoints(req.Checkpoints)
-}
+
 // ============================================================================
 // EVENT LISTENER - Convert Events to Effects
 // ============================================================================
@@ -371,16 +430,21 @@ func ListenLogistic(b *event_bus.EventBus, topic, worker_topic string, job_store
 				)
 
 			case core.CheckpointPhotoUploaded:
-				payload, ok := event.Payload.(core.CheckpointPhotoReq)
+				payload, ok := event.Payload.(core.CheckpointPhotoUploadReq)
 				if !ok {
 					fmt.Printf("ERROR: Invalid payload for CheckpointPhotoUploaded: %+v\n", event.Payload)
 					continue
 				}
-				data = CheckpointPhotoUploaded(
-					payload.CheckpointID,
-					payload.PhotoURL,
+				result := CheckpointPhotoUploaded(
+					payload,
 					now,
 				)
+				if (result.Err != nil){
+					fmt.Print(result.Err.Error());
+					continue
+				}else{
+					data = result.Value
+				}
 
 			case core.CheckpointVerified:
 				payload, ok := event.Payload.(core.CheckpointVerifyReq)
@@ -420,7 +484,16 @@ func ListenLogistic(b *event_bus.EventBus, topic, worker_topic string, job_store
 					payload.NewEstimatedTime,
 					now,
 				)
-
+			case core.GetShipment:
+				payload, ok := event.Payload.(core.GetOrderCheckpointsReq)
+				if !ok {
+					fmt.Printf("ERROR: Invalid payload for ShipmentDelayed: %+v\n", event.Payload)
+					continue
+				}
+				data = GetOrderCheckpointsSimple(
+					payload,
+				)
+				
 			default:
 				fmt.Printf("WARN: Unknown SubTopic: %s\n", event.SubTopic)
 				continue
