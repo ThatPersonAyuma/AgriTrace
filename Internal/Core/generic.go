@@ -1,6 +1,10 @@
 package core
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 type SubTopic string
 
@@ -50,15 +54,6 @@ type SerachKeyword struct {
 
 type Nothing struct {
 }
-type ShipmentCreatedReq struct {
-	OrderID         int       `json:"order_id"`
-	DeliveryStaffID int       `json:"delivery_staff_id"`
-	StartLat        float64   `json:"start_lat"`
-	StartLong       float64   `json:"start_long"`
-	EndLat          float64   `json:"end_lat"`
-	EndLong         float64   `json:"end_long"`
-	EstimatedTime   time.Time `json:"estimated_time"`
-}
 
 type CheckpointAddedReq struct {
 	OrderID int     `json:"order_id"`
@@ -104,3 +99,45 @@ type AccountUpdatedReq struct {
     Email     string    `json:"email"`
     Phone     string    `json:"phone"`
 }
+type CheckpointType string
+
+const (
+	CheckpointStart  CheckpointType = "START"
+	CheckpointOnRoad CheckpointType = "ONROAD"
+	CheckpointEnd    CheckpointType = "END"
+)
+
+type Checkpoint struct {
+	Type      CheckpointType `json:"type"`
+	Lat       float64        `json:"lat"`
+	Long      float64        `json:"long"`
+	Notes     string         `json:"notes,omitempty"`
+	Timestamp time.Time      `json:"timestamp,omitempty"`
+}
+
+type ShipmentCreatedReq struct {
+	OrderID         int          `json:"order_id"`
+	DeliveryStaffID int          `json:"delivery_staff_id"`
+	EstimatedTime   time.Time    `json:"estimated_time"`
+	Checkpoints     []Checkpoint `json:"checkpoints"`
+}
+
+func (ct *CheckpointType) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	switch CheckpointType(s) {
+	case CheckpointStart, CheckpointOnRoad, CheckpointEnd:
+		*ct = CheckpointType(s)
+		return nil
+	default:
+		return fmt.Errorf("invalid checkpoint type: %s", s)
+	}
+}
+
+func (ct CheckpointType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(ct))
+}
+

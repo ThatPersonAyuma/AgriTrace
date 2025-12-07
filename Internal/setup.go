@@ -37,7 +37,7 @@ func Setup() func(*http.ServeMux, *event_bus.EventBus, *sql.DB){
 		mux.HandleFunc("/product/listed", http_adapters.CreateFuncHandler[core.Nothing](eventBus, &job_store, http.MethodGet, fmt.Sprintf("Product.%s", core.ProductListed)))
 		mux.HandleFunc("/product/unlisted", http_adapters.CreateFuncHandler[core.Nothing](eventBus, &job_store, http.MethodGet, fmt.Sprintf("Product.%s", core.ProductUnlisted)))
 		mux.HandleFunc("/product/search", http_adapters.CreateFuncHandler[core.SerachKeyword](eventBus, &job_store, http.MethodGet, fmt.Sprintf("Product.%s", core.SerachProduct)))
-
+		
 		// Accounts
 		mux.HandleFunc("/account/create", http_adapters.CreateFuncHandler[core.AccountCreatedReq](eventBus, &job_store, http.MethodPost, fmt.Sprintf("Account.%s", core.AccountCreated)))
 		mux.HandleFunc("/account/update", http_adapters.CreateFuncHandler[core.AccountUpdatedReq](eventBus, &job_store, http.MethodPost, fmt.Sprintf("Account.%s", core.AccountUpdated)))

@@ -103,43 +103,45 @@ func ParseRequestParams[T any](r *http.Request) generic.Result[T] {
 }
 
 
-func CreateFuncHandler[T any](b *event_bus.EventBus, job_store *generic.JobStore, method string, topic string)func(http.ResponseWriter, *http.Request){
-	return func (w http.ResponseWriter, r *http.Request){
-
-		// if r.Method != method {
-		// 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		// 	return
-		// }
-		// var payload T
-		// var payload T
-		// // Decode JSON body
-		// err := json.NewDecoder(r.Body).Decode(&payload)
-
+func CreateFuncHandler[T any](b *event_bus.EventBus, jobStore *generic.JobStore, method string, topic string) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		id := uuid.New().String()
 		status := "submitted"
+
 		result := ParseRequestParams[T](r)
-		if result.Err!=nil{
-			fmt.Printf("Error on request: %s", result.Err)
+
+		response := map[string]string{
+			"job_id": id,
+			"status": status,
+		}
+
+		if result.Err != nil {
 			status = "error"
-			job_store.Data[id] = generic.JobResult{
-										Status: "Error",
-										Error: result.Err.Error(),
-									}
-		}else{
-			job_store.Data[id] = generic.JobResult{
-										Status: "Processing",
-									}
-			b.Publish(topic, event_bus.Event{WorkId: id, Payload: result.Value})
+			response["status"] = status
+			response["error"] = result.Err.Error()
+
+			jobStore.Lock()
+			jobStore.Data[id] = generic.JobResult{
+				Status: "Error",
+				Error:  result.Err.Error(),
+			}
+			jobStore.Unlock()
+			fmt.Print(r.Body);
+			fmt.Printf("Error on request: %s\n", result.Err)
+		} else {
+			jobStore.Lock()
+			jobStore.Data[id] = generic.JobResult{
+				Status: "Processing",
+			}
+			jobStore.Unlock()
+
+			b.Publish(topic, event_bus.Event{
+				WorkId:  id,
+				Payload: result.Value,
+			})
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		respone := map[string]string{
-            "job_id": id,
-            "status": status,
-        }
-		if status == "error"{
-			respone["error"] = result.Err.Error()
-		}
-        json.NewEncoder(w).Encode(respone)
+		json.NewEncoder(w).Encode(response)
 	}
 }

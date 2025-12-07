@@ -82,51 +82,52 @@ func GetShipmentCreatedEffect( // Fungsi untuk membuat data yang dibutuhkan effe
 func ShipmentCreated(
 	orderID int,
 	deliveryStaffID int,
-	startLat, startLong float64,
-	endLat, endLong float64,
+	checkpoints []core.Checkpoint,
 	estimatedTime time.Time,
 	now time.Time,
-) []generic.Effect {
-	return []generic.Effect{
-		// Insert START checkpoint
-		{
-			Type: generic.EffectDBQuery,
-			ExecCommand: `
-				INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, type, notes)
-				VALUES ($1, $2, $3, $4, $5, 'START', $6)
-				RETURNING id
-			`,
-			Args: []any{orderID, "START_CREATED", now, startLat, startLong, "Pickup location"},
-		},
-		// Insert END checkpoint
-		{
-			Type: generic.EffectDBQuery,
-			ExecCommand: `
-				INSERT INTO checkpoint (order_id, status, timestamp, location_lat, location_long, type, notes)
-				VALUES ($1, $2, $3, $4, $5, 'END', $6)
-				RETURNING id
-			`,
-			Args: []any{orderID, "END_CREATED", now, endLat, endLong, "Delivery destination"},
-		},
-		// Update order with shipment info
-		{
-			Type: generic.EffectDB,
-			ExecCommand: `
-				UPDATE orders
-				SET status = $1,
-					delivery_staff_id = $2,
-					estimated_time = $3,
-					updated_at = $4
-				WHERE id = $5
-			`,
-			Args: []any{"SHIPMENT_CREATED", deliveryStaffID, estimatedTime, now, orderID},
-		},
-		// Log
-		{
-			Type: generic.EffectLog,
-			Msg:  fmt.Sprintf("Shipment created for order %d by staff %d", orderID, deliveryStaffID),
-		},
+) generic.Result[[]generic.Effect] {
+	// Validate checkpoints
+	if err := validateCheckpoints(checkpoints); err != nil {
+		return generic.Result[[]generic.Effect]{Value: nil, Err:err}
 	}
+
+	effects := make([]generic.Effect, 0, len(checkpoints)+2)
+
+	// Insert all checkpoints
+	for _, cp := range checkpoints {
+		status := fmt.Sprintf("%s_CREATED", cp.Type)
+		
+		effects = append(effects, generic.Effect{
+			Type: generic.EffectDBQuery,
+			ExecCommand: `
+				INSERT INTO checkpoints (order_id, staff_id, status, timestamp, location_lat, location_long, "type", notes)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+				RETURNING id
+			`,
+			Args: []any{orderID, deliveryStaffID, status, cp.Timestamp, cp.Lat, cp.Long, string(cp.Type), cp.Notes},
+		})
+	}
+
+	// Update order with shipment info
+	effects = append(effects, generic.Effect{
+		Type: generic.EffectDB,
+		ExecCommand: `
+			UPDATE orders
+			SET status = $1,
+				estimated_time = $2,
+				updated_at = $3
+			WHERE id = $4
+		`,
+		Args: []any{"SHIPMENT_CREATED", estimatedTime, now, orderID},
+	})
+
+	// Log
+	effects = append(effects, generic.Effect{
+		Type: generic.EffectLog,
+		Msg:  fmt.Sprintf("Shipment created for order %d by staff %d with %d checkpoints", orderID, deliveryStaffID, len(checkpoints)),
+	})
+
+	return generic.Result[[]generic.Effect]{Value: effects, Err:nil}
 }
 
 func CheckpointAdded(
@@ -273,7 +274,54 @@ func ShipmentDelayed(
 		},
 	}
 }
+func validateCheckpoints(checkpoints []core.Checkpoint) error {
+	if len(checkpoints) < 2 {
+		return fmt.Errorf("at least START and END checkpoints are required")
+	}
 
+	hasStart := false
+	hasEnd := false
+
+	for _, cp := range checkpoints {
+		switch cp.Type {
+		case core.CheckpointStart:
+			if hasStart {
+				return fmt.Errorf("only one START checkpoint is allowed")
+			}
+			hasStart = true
+		case core.CheckpointEnd:
+			if hasEnd {
+				return fmt.Errorf("only one END checkpoint is allowed")
+			}
+			hasEnd = true
+		case core.CheckpointOnRoad:
+		default:
+			return fmt.Errorf("invalid checkpoint type: %s", cp.Type)
+		}
+	}
+
+	if !hasStart {
+		return fmt.Errorf("START checkpoint is required")
+	}
+	if !hasEnd {
+		return fmt.Errorf("END checkpoint is required")
+	}
+
+	return nil
+}
+// Validate validates the shipment creation request
+func Validate(req core.ShipmentCreatedReq) error {
+	if req.OrderID <= 0 {
+		return fmt.Errorf("invalid order_id")
+	}
+	if req.DeliveryStaffID <= 0 {
+		return fmt.Errorf("invalid delivery_staff_id")
+	}
+	if req.EstimatedTime.IsZero() {
+		return fmt.Errorf("estimated_time is required")
+	}
+	return validateCheckpoints(req.Checkpoints)
+}
 // ============================================================================
 // EVENT LISTENER - Convert Events to Effects
 // ============================================================================
@@ -293,16 +341,19 @@ func ListenLogistic(b *event_bus.EventBus, topic, worker_topic string, job_store
 					fmt.Printf("ERROR: Invalid payload for ShipmentCreated: %+v\n", event.Payload)
 					continue
 				}
-				data = ShipmentCreated(
+				result := ShipmentCreated(
 					payload.OrderID,
 					payload.DeliveryStaffID,
-					payload.StartLat,
-					payload.StartLong,
-					payload.EndLat,
-					payload.EndLong,
+					payload.Checkpoints,
 					payload.EstimatedTime,
-					now,
+					time.Now(),
 				)
+				if (result.Err != nil){
+					fmt.Print(result.Err.Error());
+					continue
+				}else{
+					data = result.Value
+				}
 
 			case core.CheckpointAdded:
 				payload, ok := event.Payload.(core.CheckpointAddedReq)

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logistic Dashboard with Leaflet</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  #map { height: 60vh; width: 100%; }
+</style>
+</head>
+<body>
+<h1>Logistic Dashboard with Leaflet</h1>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map').setView([-6.2, 106.8], 11);
+
+// Peta dari OSM
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+// Contoh data checkpoints
+const ordersData = [
+    {
+        orderID: 101,
+        checkpoints: [
+            {status: "START_CREATED", lat: -6.2, long: 106.8, notes: "Pickup location"},
+            {status: "PROGRESS", lat: -6.21, long: 106.81, notes: "On the way"},
+            {status: "END_CREATED", lat: -6.25, long: 106.85, notes: "Destination"}
+        ]
+    }
+];
+
+// Status color mapping
+const statusColors = {
+    "START_CREATED": "blue",
+    "PROGRESS": "orange",
+    "END_CREATED": "green"
+};
+
+// Tambah marker dan jalur
+ordersData.forEach(order => {
+    const latlngs = [];
+    order.checkpoints.forEach(cp => {
+        latlngs.push([cp.lat, cp.long]);
+        
+        L.circleMarker([cp.lat, cp.long], {
+            color: statusColors[cp.status] || 'gray',
+            radius: 8,
+            fillOpacity: 0.8
+        })
+        .addTo(map)
+        // Tooltip selalu ditampilkan
+        .bindTooltip(`${cp.status}: ${cp.notes}`, {permanent: true, direction: 'top', offset: [0, -10]});
+    });
+
+    // Draw polyline
+    L.polyline(latlngs, {color: 'blue'}).addTo(map);
+});
+
+</script>
+</body>
+</html>
